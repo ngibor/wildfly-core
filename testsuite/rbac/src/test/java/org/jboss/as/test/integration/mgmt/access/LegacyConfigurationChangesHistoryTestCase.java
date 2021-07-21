@@ -129,42 +129,58 @@ public class LegacyConfigurationChangesHistoryTestCase extends AbstractManagemen
         final ModelNode add = Util.createAddOperation(PathAddress.pathAddress(ADDRESS));
         add.get(LegacyConfigurationChangeResourceDefinition.MAX_HISTORY.getName()).set(MAX_HISTORY_SIZE);
         client.executeForResult(add);
+        Thread.sleep(1);
         // WFCORE-3995 sensitivity classification system property default configured-requires-read is false.
         // Need to write configured-requires-read before configured-requires-addressable
         ModelNode configureSensitivity = Util.getWriteAttributeOperation(SYSTEM_PROPERTY_CLASSIFICATION_ADDRESS, CONFIGURED_REQUIRES_READ, true);
         client.executeForResult(configureSensitivity);
+        Thread.sleep(1);
         configureSensitivity = Util.getWriteAttributeOperation(SYSTEM_PROPERTY_CLASSIFICATION_ADDRESS, CONFIGURED_REQUIRES_ADDRESSABLE, true);
         client.executeForResult(configureSensitivity);
+        Thread.sleep(1);
         ModelNode setAllowedOrigins = Util.createEmptyOperation("list-add", ALLOWED_ORIGINS_ADDRESS);
         setAllowedOrigins.get(NAME).set(ALLOWED_ORIGINS);
         setAllowedOrigins.get(VALUE).set("http://www.wildfly.org");
         client.executeForResult(setAllowedOrigins);
+        Thread.sleep(1);
         ModelNode disableLogBoot = Util.getWriteAttributeOperation(AUDIT_LOG_ADDRESS, LOG_BOOT, false);
         client.executeForResult(disableLogBoot);
+        Thread.sleep(1);
         //read
         client.executeForResult(Util.getReadAttributeOperation(ALLOWED_ORIGINS_ADDRESS, ALLOWED_ORIGINS));
+        Thread.sleep(1);
         //invalid operation
         client.getControllerClient().execute(Util.getUndefineAttributeOperation(ALLOWED_ORIGINS_ADDRESS, "not-exists-attribute"));
+        Thread.sleep(1);
         //invalid operation
         client.getControllerClient().execute(Util.getWriteAttributeOperation(ALLOWED_ORIGINS_ADDRESS, "not-exists-attribute", "123456"));
+        Thread.sleep(1);
         //write operation, failed
         ModelNode setAllowedOriginsFails = Util.getWriteAttributeOperation(ALLOWED_ORIGINS_ADDRESS, ALLOWED_ORIGINS, "123456");//wrong type, expected is LIST, op list-add
         client.getControllerClient().execute(setAllowedOriginsFails);
+        Thread.sleep(1);
         ModelNode setSystemProperty = Util.createAddOperation(SYSTEM_PROPERTY_ADDRESS);
         setSystemProperty.get(VALUE).set("changeConfig");
         client.getControllerClient().execute(setSystemProperty);
+        Thread.sleep(1);
         ModelNode unsetAllowedOrigins = Util.getUndefineAttributeOperation(ALLOWED_ORIGINS_ADDRESS, ALLOWED_ORIGINS);
         client.getControllerClient().execute(unsetAllowedOrigins);
+        Thread.sleep(1);
         ModelNode enableLogBoot = Util.getWriteAttributeOperation(AUDIT_LOG_ADDRESS, LOG_BOOT, true);
         client.getControllerClient().execute(enableLogBoot);
+        Thread.sleep(1);
         ModelNode unsetSystemProperty = Util.createRemoveOperation(SYSTEM_PROPERTY_ADDRESS);
         client.getControllerClient().execute(unsetSystemProperty);
+        Thread.sleep(1);
         ModelNode addInMemoryHandler = Util.createAddOperation(IN_MEMORY_HANDLER_ADDRESS);
         client.getControllerClient().execute(addInMemoryHandler);
+        Thread.sleep(1);
         ModelNode editInMemoryHandler = Util.getWriteAttributeOperation(IN_MEMORY_HANDLER_ADDRESS, MAX_HISTORY, 50);
         client.getControllerClient().execute(editInMemoryHandler);
+        Thread.sleep(1);
         ModelNode removeInMemoryHandler = Util.createRemoveOperation(IN_MEMORY_HANDLER_ADDRESS);
         client.getControllerClient().execute(removeInMemoryHandler);
+        Thread.sleep(1);
     }
 
     @After
