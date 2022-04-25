@@ -49,7 +49,7 @@ public abstract class TestModelControllerService extends AbstractControllerServi
     private final CapabilityRegistry capabilityRegistry;
 
     protected TestModelControllerService(ProcessType processType, final ConfigurationPersister configurationPersister, final ControlledProcessState processState) {
-        this(processType, configurationPersister, processState, ResourceBuilder.Factory.create(PathElement.pathElement("root"), new NonResolvingResourceDescriptionResolver()).build());
+        this(processType, configurationPersister, processState, ResourceBuilder.Factory.create(PathElement.pathElement("root"), NonResolvingResourceDescriptionResolver.INSTANCE).build());
     }
 
     protected TestModelControllerService(final ProcessType processType, final ConfigurationPersister configurationPersister, final ControlledProcessState processState,
@@ -66,7 +66,7 @@ public abstract class TestModelControllerService extends AbstractControllerServi
                                          final ConfigurationPersister configurationPersister, final ControlledProcessState processState,
                                          final ResourceDefinition rootResourceDefinition, final CapabilityRegistry capabilityRegistry) {
         super(executorService, null, processType, runningModeControl, configurationPersister, processState, rootResourceDefinition, null, ExpressionResolver.TEST_RESOLVER,
-                AuditLogger.NO_OP_LOGGER, new DelegatingConfigurableAuthorizer(), new ManagementSecurityIdentitySupplier(), capabilityRegistry);
+                AuditLogger.NO_OP_LOGGER, new DelegatingConfigurableAuthorizer(), new ManagementSecurityIdentitySupplier(), capabilityRegistry, null);
         this.capabilityRegistry = capabilityRegistry;
     }
 

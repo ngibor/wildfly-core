@@ -39,8 +39,6 @@ import org.jboss.logging.annotations.Cause;
 import org.jboss.logging.annotations.LogMessage;
 import org.jboss.logging.annotations.Message;
 import org.jboss.logging.annotations.MessageLogger;
-import org.jboss.marshalling.Marshaller;
-import org.jboss.marshalling.Unmarshaller;
 
 /**
  * Date: 29.06.2011
@@ -439,7 +437,7 @@ public interface ProcessLogger extends BasicLogger {
     String argAdminOnly();
 
     /**
-     * Instructions for the {@link CommandLineConstants#MASTER_ADDRESS} command line argument.
+     * Instructions for the {@link CommandLineConstants#PRIMARY_ADDRESS} command line argument.
      *
      * @return the message.
      */
@@ -447,7 +445,7 @@ public interface ProcessLogger extends BasicLogger {
     String argMasterAddress();
 
     /**
-     * Instructions for the {@link CommandLineConstants#MASTER_PORT} command line argument.
+     * Instructions for the {@link CommandLineConstants#PRIMARY_PORT} command line argument.
      *
      * @return the message.
      */
@@ -587,25 +585,13 @@ public interface ProcessLogger extends BasicLogger {
     @Message(id = 36, value = "Failed to close a socket")
     void failedToCloseSocket(@Cause Throwable cause);
 
-    /**
-     * Logs an error message indicating a failure to finish the marshaller.
-     *
-     * @param cause      the cause of the error.
-     * @param marshaller the marshaller in error.
-     */
-    @LogMessage(level = ERROR)
-    @Message(id = 37, value = "Failed to finish the marshaller %s")
-    void failedToFinishMarshaller(@Cause Throwable cause, Marshaller marshaller);
+    //@LogMessage(level = ERROR)
+    //@Message(id = 37, value = "Failed to finish the marshaller %s")
+    //void failedToFinishMarshaller(@Cause Throwable cause, Marshaller marshaller);
 
-    /**
-     * Logs an error message indicating a failure to finish the unmarshaller.
-     *
-     * @param cause        the cause of the error.
-     * @param unmarshaller the marshaller in error.
-     */
-    @LogMessage(level = ERROR)
-    @Message(id = 38, value = "Failed to finish the unmarshaller %s")
-    void failedToFinishUnmarshaller(@Cause Throwable cause, Unmarshaller unmarshaller);
+    //@LogMessage(level = ERROR)
+    //@Message(id = 38, value = "Failed to finish the unmarshaller %s")
+    //void failedToFinishUnmarshaller(@Cause Throwable cause, Unmarshaller unmarshaller);
 
     /**
      * Logs an error message indicating a failure to handle the incoming connection.

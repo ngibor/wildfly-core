@@ -66,6 +66,7 @@ public class HostExcludeResourceDefinition extends SimpleResourceDefinition {
         EAP71("EAP7.1", KernelAPIVersion.VERSION_5_0),
         EAP72("EAP7.2", KernelAPIVersion.VERSION_8_0),
         EAP73("EAP7.3", KernelAPIVersion.VERSION_10_0),
+        EAP74("EAP7.4", KernelAPIVersion.VERSION_16_0),
         WILDFLY10("WildFly10.0", KernelAPIVersion.VERSION_4_0),
         WILDFLY10_1("WildFly10.1", KernelAPIVersion.VERSION_4_2),
         WILDFLY11("WildFly11.0", KernelAPIVersion.VERSION_5_0),
@@ -81,9 +82,9 @@ public class HostExcludeResourceDefinition extends SimpleResourceDefinition {
         WILDFLY21("WildFly21.0", KernelAPIVersion.VERSION_14_0),
         WILDFLY22("WildFly22.0", KernelAPIVersion.VERSION_15_0),
         WILDFLY23("WildFly23.0", KernelAPIVersion.VERSION_16_0),
-        WILDFLY24("WildFly24.0", KernelAPIVersion.VERSION_17_0);
-
-
+        WILDFLY24("WildFly24.0", KernelAPIVersion.VERSION_17_0),
+        WILDFLY25("WildFly25.0", KernelAPIVersion.VERSION_18_0),
+        WILDFLY26("WildFly26.0", KernelAPIVersion.VERSION_19_0);
 
         private static final Map<String, KnownRelease> map = new HashMap<>();
         static {
@@ -115,7 +116,7 @@ public class HostExcludeResourceDefinition extends SimpleResourceDefinition {
             SimpleAttributeDefinitionBuilder.create(ModelDescriptionConstants.HOST_RELEASE, ModelType.STRING, false)
                     .setXmlName("id")
                     .setAlternatives(ModelDescriptionConstants.MANAGEMENT_MAJOR_VERSION)
-                    .setValidator(EnumValidator.create(KnownRelease.class, false, false))
+                    .setValidator(EnumValidator.create(KnownRelease.class))
                     .build();
 
     public static final SimpleAttributeDefinition MANAGEMENT_MAJOR_VERSION =

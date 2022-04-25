@@ -83,6 +83,7 @@ import org.jboss.as.controller.extension.ParallelExtensionAddHandler;
 import org.jboss.as.controller.logging.ControllerLogger;
 import org.jboss.as.controller.notification.NotificationSupport;
 import org.jboss.as.controller.operations.global.ReadResourceHandler;
+import org.jboss.as.controller.persistence.ConfigurationExtension;
 import org.jboss.as.controller.persistence.ConfigurationPersistenceException;
 import org.jboss.as.controller.persistence.ConfigurationPersister;
 import org.jboss.as.controller.registry.DelegatingResource;
@@ -496,7 +497,7 @@ class ModelControllerImpl implements ModelController {
 
     boolean boot(final List<ModelNode> bootList, final OperationMessageHandler handler, final OperationTransactionControl control,
                  final boolean rollbackOnRuntimeFailure, MutableRootResourceRegistrationProvider parallelBootRootResourceRegistrationProvider,
-                 final boolean skipModelValidation, final boolean partialModel) {
+                 final boolean skipModelValidation, final boolean partialModel, final ConfigurationExtension configExtension) {
 
         final Integer operationID = random.nextInt();
 
@@ -511,6 +512,7 @@ class ModelControllerImpl implements ModelController {
         // Add to the context all ops prior to the first ExtensionAddHandler as well as all ExtensionAddHandlers; save the rest.
         // This gets extensions registered before proceeding to other ops that count on these registrations
         BootOperations bootOperations = organizeBootOperations(bootList, operationID, parallelBootRootResourceRegistrationProvider);
+
         OperationContext.ResultAction resultAction = bootOperations.invalid ? OperationContext.ResultAction.ROLLBACK : OperationContext.ResultAction.KEEP;
         if (!bootOperations.initialOps.isEmpty()) {
             // Run the steps up to the last ExtensionAddHandler
@@ -519,6 +521,7 @@ class ModelControllerImpl implements ModelController {
             }
             resultAction = context.executeOperation();
         }
+        //here the meta-model is available
         if (resultAction == OperationContext.ResultAction.KEEP && bootOperations.postExtensionOps != null) {
             // Success. Now any extension handlers are registered. Continue with remaining ops
             final AbstractOperationContext postExtContext = new OperationContextImpl(operationID, POST_EXTENSION_BOOT_OPERATION,
@@ -526,7 +529,9 @@ class ModelControllerImpl implements ModelController {
                     headers, handler, null, managementModel.get(), control, processState, auditLogger,
                             bootingFlag.get(), true, hostServerGroupTracker, null, notificationSupport, true,
                             extraValidationStepHandler, partialModel, securityIdentitySupplier);
-
+            if (configExtension != null && configExtension.shouldProcessOperations(runningModeControl.getRunningMode())) {
+                configExtension.processOperations(managementModel.get().getRootResourceRegistration(), bootOperations.postExtensionOps);
+            }
             for (ParsedBootOp parsedOp : bootOperations.postExtensionOps) {
                 if (parsedOp.handler == null) {
                     // The extension should have registered the handler now
@@ -539,15 +544,23 @@ class ModelControllerImpl implements ModelController {
                     // stop
                     break;
                 } else {
-                    postExtContext.addBootStep(parsedOp);
+                    if(parsedOp.handler instanceof ParallelBootOperationStepHandler &&
+                            ((ParallelBootOperationStepHandler)parsedOp.handler).getParsedBootOp().getChildOperations().size() != parsedOp.getChildOperations().size()) {
+                        ParallelBootOperationStepHandler updatedHandler =  new ParallelBootOperationStepHandler(executorService, managementModel.get().getRootResourceRegistration(), processState, this, operationID, extraValidationStepHandler);
+                        for(ModelNode childOp : parsedOp.getChildOperations()) {
+                            updatedHandler.addSubsystemOperation(new ParsedBootOp(childOp));
+                        }
+                        postExtContext.addBootStep(new ParsedBootOp(parsedOp.operation, updatedHandler));
+                    } else {
+                        postExtContext.addBootStep(parsedOp);
+                    }
                 }
             }
-
             resultAction = postExtContext.executeOperation();
 
             if (!skipModelValidation && resultAction == OperationContext.ResultAction.KEEP && bootOperations.postExtensionOps != null) {
                 //Get the modified resources from the initial operations and add to the resources to be validated by the post operations
-                Set<PathAddress> validateAddresses = new HashSet<PathAddress>();
+                Set<PathAddress> validateAddresses = new HashSet<>();
                 Resource root = managementModel.get().getRootResource();
                 addAllAddresses(managementModel.get().getRootResourceRegistration(), PathAddress.EMPTY_ADDRESS, root, validateAddresses);
 
@@ -560,7 +573,6 @@ class ModelControllerImpl implements ModelController {
                 resultAction = validateContext.executeOperation();
             }
         }
-
         return  resultAction == OperationContext.ResultAction.KEEP;
     }
 
@@ -690,7 +702,6 @@ class ModelControllerImpl implements ModelController {
                 }
             }
         }
-
 
         return new BootOperations(initialOps, postExtensionOps, invalid);
     }

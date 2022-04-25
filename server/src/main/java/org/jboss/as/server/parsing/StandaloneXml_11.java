@@ -41,6 +41,7 @@ import static org.jboss.as.controller.parsing.ParseUtils.requireNoContent;
 import static org.jboss.as.controller.parsing.ParseUtils.requireSingleAttribute;
 import static org.jboss.as.controller.parsing.ParseUtils.unexpectedAttribute;
 import static org.jboss.as.controller.parsing.ParseUtils.unexpectedElement;
+import static org.jboss.as.server.logging.ServerLogger.ROOT_LOGGER;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -79,7 +80,7 @@ import org.jboss.dmr.Property;
 import org.jboss.staxmapper.XMLExtendedStreamReader;
 
 /**
- * Parser and marshaller for standalone server configuration xml documents (e.g. standalone.xml) that use the urn:jboss:domain:11.0 schema.
+ * Parser and marshaller for standalone server configuration xml documents (e.g. standalone.xml) that use the urn:jboss:domain:11.0 schema and up.
  *
  * @author Brian Stansberry
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
@@ -270,8 +271,7 @@ final class StandaloneXml_11 extends CommonXml implements ManagementXmlDelegate 
                         break;
                     }
                     case SECURITY_REALM: {
-                        HttpManagementResourceDefinition.SECURITY_REALM.parseAndSetParameter(value, addOp, reader);
-                        break;
+                        throw ROOT_LOGGER.securityRealmReferencesUnsupported();
                     }
                     case SERVER_NAME: {
                         HttpManagementResourceDefinition.SERVER_NAME.parseAndSetParameter(value, addOp, reader);
@@ -314,8 +314,7 @@ final class StandaloneXml_11 extends CommonXml implements ManagementXmlDelegate 
                         break;
                     }
                     case SECURITY_REALM: {
-                        NativeManagementResourceDefinition.SECURITY_REALM.parseAndSetParameter(value, addOp, reader);
-                        break;
+                        throw ROOT_LOGGER.securityRealmReferencesUnsupported();
                     }
                     case SERVER_NAME: {
                         NativeManagementResourceDefinition.SERVER_NAME.parseAndSetParameter(value, addOp, reader);

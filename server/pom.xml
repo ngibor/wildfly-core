@@ -29,7 +29,7 @@
     <parent>
         <groupId>org.wildfly.core</groupId>
         <artifactId>wildfly-core-parent</artifactId>
-        <version>17.0.0.Beta3-SNAPSHOT</version>
+        <version>19.0.0.Beta8-SNAPSHOT</version>
     </parent>
 
     <artifactId>wildfly-server</artifactId>
@@ -181,23 +181,7 @@
             <groupId>org.apache.sshd</groupId>
             <artifactId>sshd-core</artifactId>
         </dependency>
-        <!--
-        <dependency>
-            <groupId>org.picketbox</groupId>
-            <artifactId>picketbox</artifactId>
-        </dependency>
-        -->
         <!-- Test Dependencies -->
-        <dependency>
-            <groupId>com.fasterxml.woodstox</groupId>
-            <artifactId>woodstox-core</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>xerces</groupId>
-            <artifactId>xercesImpl</artifactId>
-            <scope>test</scope>
-        </dependency>
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>

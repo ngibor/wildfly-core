@@ -161,7 +161,7 @@ public class ModelControllerMBeanTestCase extends AbstractSubsystemTest {
         super.cleanup();
         IoUtils.safeClose(jmxConnector);
         jmxConnector = null;
-        kernelServices = kernelServices;
+        kernelServices = null;
     }
 
     @Test
@@ -695,8 +695,9 @@ public class ModelControllerMBeanTestCase extends AbstractSubsystemTest {
 
         MBeanInfo info = connection.getMBeanInfo(name);
         CompositeType complexType = assertCast(CompositeType.class, findAttribute(info.getAttributes(), "complex").getOpenType());
+        CompositeData compositeData = createComplexData(connection, complexType, 1, BigDecimal.valueOf(2.0));
         try {
-            connection.setAttribute(name, new Attribute("complex", createComplexData(connection, complexType, 1, BigDecimal.valueOf(2.0))));
+            connection.setAttribute(name, new Attribute("complex", compositeData));
             Assert.fail("Complex not writable");
         } catch (Exception expected) {
             //expected
@@ -1681,7 +1682,7 @@ public class ModelControllerMBeanTestCase extends AbstractSubsystemTest {
 
             RemotingServices.installConnectorServicesForSocketBinding(target, ManagementRemotingServices.MANAGEMENT_ENDPOINT,
                     "server", SocketBinding.JBOSS_BINDING_NAME.append("server"), OptionMap.EMPTY,
-                    null, null, null, ServiceName.parse("org.wildfly.management.socket-binding-manager"));
+                    null, null, ServiceName.parse("org.wildfly.management.socket-binding-manager"));
         }
 
         @Override

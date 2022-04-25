@@ -21,12 +21,16 @@
 */
 package org.jboss.as.server;
 
-import org.jboss.as.controller.ExpressionResolver;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
+
+import org.jboss.as.controller.extension.ExpressionResolverExtension;
 import org.jboss.as.controller.ExpressionResolverImpl;
+import org.jboss.as.controller.OperationClientException;
 import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationFailedException;
-import org.jboss.as.controller.VaultReader;
-import org.jboss.as.controller.logging.ControllerLogger;
+import org.jboss.as.controller.extension.ResolverExtensionRegistry;
 import org.jboss.dmr.ModelNode;
 import org.jboss.logging.Logger;
 
@@ -35,70 +39,74 @@ import org.jboss.logging.Logger;
  * @author <a href="kabir.khan@jboss.com">Kabir Khan</a>
  * @author <a href="mailto:darran.lofthouse@jboss.com">Darran Lofthouse</a>
  */
-public class RuntimeExpressionResolver extends ExpressionResolverImpl {
+public class RuntimeExpressionResolver extends ExpressionResolverImpl implements ResolverExtensionRegistry {
 
     private static final Logger log = Logger.getLogger(RuntimeExpressionResolver.class);
 
-    private static final String EXPRESSION_RESOLVER_CAPABILITY = "org.wildfly.controller.expression-resolver";
+    // guarded by this
+    private final Set<ExpressionResolverExtension> extensions = new HashSet<>();
 
-    private final VaultReader vaultReader;
+    @Override
+    public synchronized void addResolverExtension(ExpressionResolverExtension extension) {
+        extensions.add(extension);
+    }
 
-    public RuntimeExpressionResolver(VaultReader vaultReader) {
-        this.vaultReader = vaultReader;
+    @Override
+    public synchronized void removeResolverExtension(ExpressionResolverExtension extension) {
+        extensions.remove(extension);
     }
 
     @Override
     protected void resolvePluggableExpression(ModelNode node, OperationContext context) throws OperationFailedException {
         String expression = node.asString();
-        if (expression.length() > 3) {
-            String expressionValue = expression.substring(2, expression.length() -1);
+        if (context != null && expression.length() > 3) {
 
-            /*
-             * Step 1 - Attempt to resolve using the VaultReader.
-             */
+            // Cycle through all registered extensions until one returns a result.
+            // Cache any exceptions (first of each type) so we can propagate them
+            // if none return a result
+            String result = null;
+            OperationFailedException ofe = null;
+            RuntimeException operationClientException = null;
+            RuntimeException otherRe = null;
 
-            if (vaultReader == null) {
-                // No VaultReader was configured or could be loaded given the modules on the classpath
-                // This is common in WildFly Core itself as the org.picketbox module is not present
-                // to allow loading the standard RuntimeVaultReader impl
-
-                // Just check for a PicketBox vault pattern and if present reject
-                // We don't want to let vault expressions pass as other resolvers will treat the ":'
-                // as a system property name vs default value delimiter
-                if (VaultReader.STANDARD_VAULT_PATTERN.matcher(expressionValue).matches()) {
-                    log.tracef("Cannot resolve %s -- it is in the default vault format but no vault reader is available", expressionValue);
-                    throw ControllerLogger.ROOT_LOGGER.cannotResolveExpression(expression);
+            synchronized (extensions) {
+                Iterator<ExpressionResolverExtension> iter = extensions.iterator();
+                while (result == null && iter.hasNext()) {
+                    try {
+                        result = resolveExpression(expression, iter.next(), context);
+                    } catch (OperationFailedException oe) {
+                        if (ofe == null) {
+                            ofe = oe;
+                        }
+                    } catch (RuntimeException re) {
+                        if (re instanceof OperationClientException) {
+                            if (operationClientException == null) {
+                                operationClientException = re;
+                            }
+                        } else if (otherRe == null) {
+                            otherRe = re;
+                        }
+                    }
                 }
-                log.tracef("Not resolving %s -- no vault reader available and not in default vault format", expressionValue);
-            } else if (vaultReader.isVaultFormat(expressionValue)) {
-                try {
-                    String retrieved = vaultReader.retrieveFromVault(expressionValue);
-                    log.tracef("Retrieved %s from vault for %s", retrieved, expressionValue);
-                    node.set(retrieved);
-                    return;
-                } catch (VaultReader.NoSuchItemException nsie) {
-                    throw ControllerLogger.ROOT_LOGGER.cannotResolveExpression(expression);
-                }
-            } else {
-                log.tracef("Not resolving %s -- not in vault format", expressionValue);
             }
 
-            /*
-             * Step 2 - Use ExpressionResolver capability if available.
-             */
-
-            if (context != null) {
-                try {
-                    ExpressionResolver expressionResolver = context.getCapabilityRuntimeAPI(EXPRESSION_RESOLVER_CAPABILITY, ExpressionResolver.class);
-                    ModelNode result = expressionResolver.resolveExpressions(node, context);
-                    if (result != null) {
-                        node.set(result.asString());
-                    }
-                } catch (IllegalStateException e) {
-                    // We can't cache this state as it could be added in a later operation.
-                    log.tracef("Not resolving %s -- runtime capability not available.", expressionValue);
-                }
+            // If we have a result use it, otherwise throw an exception caught,
+            // preferring OFEs, then other OperationClientExceptions, then server faults.
+            // If no exceptions and no results, the caller will just carry on.
+            if (result != null) {
+                node.set(result);
+            } else if (ofe != null) {
+                throw ofe;
+            } else if (operationClientException != null) {
+                throw operationClientException;
+            } else if (otherRe != null) {
+                throw otherRe;
             }
         }
+    }
+
+    private String resolveExpression(String expression, ExpressionResolverExtension resolver, OperationContext context) throws OperationFailedException {
+        resolver.initialize(context);
+        return resolver.resolveExpression(expression, context);
     }
 }

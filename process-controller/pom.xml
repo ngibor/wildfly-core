@@ -29,7 +29,7 @@
     <parent>
         <groupId>org.wildfly.core</groupId>
         <artifactId>wildfly-core-parent</artifactId>
-        <version>17.0.0.Beta3-SNAPSHOT</version>
+        <version>19.0.0.Beta8-SNAPSHOT</version>
     </parent>
 
     <artifactId>wildfly-process-controller</artifactId>
@@ -87,10 +87,6 @@
                   projects that depend on this project.-->
             <scope>provided</scope>
             <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>org.jboss.marshalling</groupId>
-            <artifactId>jboss-marshalling</artifactId>
         </dependency>
        <dependency>
             <groupId>org.jboss.threads</groupId>

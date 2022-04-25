@@ -54,6 +54,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
 import java.security.PrivateKey;
 import java.security.Provider;
+import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -690,14 +691,8 @@ class SSLDefinitions {
                 final String aliasFilter = ALIAS_FILTER.resolveModelAttribute(context, model).asStringOrNull();
                 final String algorithm = algorithmName != null ? algorithmName : TrustManagerFactory.getDefaultAlgorithm();
 
-                ModelNode crlNode = CERTIFICATE_REVOCATION_LIST.resolveModelAttribute(context, model);
-                ModelNode ocspNode = OCSP.resolveModelAttribute(context, model);
-                boolean softFail = SOFT_FAIL.resolveModelAttribute(context, model).asBoolean();
-                Integer maxCertPath = MAXIMUM_CERT_PATH.resolveModelAttribute(context, model).asIntOrNull();
-                ModelNode multipleCrlsNode = CERTIFICATE_REVOCATION_LISTS.resolveModelAttribute(context, model);
-
-                if (crlNode.isDefined() || ocspNode.isDefined() || multipleCrlsNode.isDefined()) {
-                        return createX509RevocationTrustManager(serviceBuilder, context, algorithm, providerName, providersInjector, keyStoreInjector, softFail, crlNode, multipleCrlsNode, ocspNode, maxCertPath, aliasFilter);
+                if (model.hasDefined(CERTIFICATE_REVOCATION_LIST.getName()) || model.hasDefined(OCSP.getName()) || model.hasDefined(CERTIFICATE_REVOCATION_LISTS.getName())) {
+                    return createX509RevocationTrustManager(serviceBuilder, context, model, algorithm, providerName, providersInjector, keyStoreInjector, aliasFilter);
                 }
 
                 DelegatingTrustManager delegatingTrustManager = new DelegatingTrustManager();
@@ -735,7 +730,16 @@ class SSLDefinitions {
                 };
             }
 
-            private ValueSupplier<TrustManager> createX509RevocationTrustManager(ServiceBuilder<TrustManager> serviceBuilder, OperationContext context, String algorithm, String providerName, InjectedValue<Provider[]> providersInjector, InjectedValue<KeyStore> keyStoreInjector, boolean softFail, ModelNode crlNode, ModelNode multipleCrlsNode, ModelNode ocspNode, Integer maxCertPath, String aliasFilter) throws OperationFailedException {
+            private ValueSupplier<TrustManager> createX509RevocationTrustManager(ServiceBuilder<TrustManager> serviceBuilder, OperationContext context,
+                    ModelNode model, String algorithm, String providerName, InjectedValue<Provider[]> providersInjector,
+                    InjectedValue<KeyStore> keyStoreInjector, String aliasFilter) throws OperationFailedException {
+
+                ModelNode crlNode = CERTIFICATE_REVOCATION_LIST.resolveModelAttribute(context, model);
+                ModelNode ocspNode = OCSP.resolveModelAttribute(context, model);
+                ModelNode multipleCrlsNode = CERTIFICATE_REVOCATION_LISTS.resolveModelAttribute(context, model);
+                boolean softFail = SOFT_FAIL.resolveModelAttribute(context, model).asBoolean();
+                boolean onlyLeafCert = ONLY_LEAF_CERT.resolveModelAttribute(context, model).asBoolean();
+                Integer maxCertPath = MAXIMUM_CERT_PATH.resolveModelAttribute(context, model).asIntOrNull();
 
                 //BW compatibility, max cert path is now in trust-manager
                 @Deprecated
@@ -762,21 +766,21 @@ class SSLDefinitions {
                             serviceBuilder.addDependency(PathManagerService.SERVICE_NAME, PathManager.class, pathManagerInjector);
                             serviceBuilder.requires(pathName(crlRelativeTo));
                         }
+                        crlFiles.add(new CrlFile(crlPath, crlRelativeTo, pathManagerInjector));
                     }
-
-                    crlFiles.add(new CrlFile(crlPath, crlRelativeTo, pathManagerInjector));
-
                 } else if (multipleCrlsNode.isDefined()) {
                     // certificate-revocation-lists and certificate-revocation-list are mutually exclusive
                     for (ModelNode crl : multipleCrlsNode.asList()) {
                         crlPath = PATH.resolveModelAttribute(context, crl).asStringOrNull();
                         crlRelativeTo = RELATIVE_TO.resolveModelAttribute(context, crl).asStringOrNull();
                         pathManagerInjector = new InjectedValue();
-                        if (crlPath != null && crlRelativeTo != null) {
-                            serviceBuilder.addDependency(PathManagerService.SERVICE_NAME, PathManager.class, pathManagerInjector);
-                            serviceBuilder.requires(pathName(crlRelativeTo));
+                        if (crlPath != null) {
+                            if (crlRelativeTo != null) {
+                                serviceBuilder.addDependency(PathManagerService.SERVICE_NAME, PathManager.class, pathManagerInjector);
+                                serviceBuilder.requires(pathName(crlRelativeTo));
+                            }
+                            crlFiles.add(new CrlFile(crlPath, crlRelativeTo, pathManagerInjector));
                         }
-                        crlFiles.add(new CrlFile(crlPath, crlRelativeTo, pathManagerInjector));
                     }
                 }
 
@@ -803,18 +807,19 @@ class SSLDefinitions {
                 X509RevocationTrustManager.Builder builder = X509RevocationTrustManager.builder();
                 builder.setResponderURI(responderUri);
                 builder.setSoftFail(softFail);
+                builder.setOnlyEndEntity(onlyLeafCert);
                 if (maxCertPath != null) {
                     builder.setMaxCertPath(maxCertPath.intValue());
                 }
-                if (crlNode.isDefined()) {
-                    if (!ocspNode.isDefined()) {
+                if (model.hasDefined(CERTIFICATE_REVOCATION_LIST.getName()) || model.hasDefined(CERTIFICATE_REVOCATION_LISTS.getName())) {
+                    if (!model.hasDefined(OCSP.getName())) {
                         builder.setPreferCrls(true);
                         builder.setNoFallback(true);
                     }
                 }
-                if (ocspNode.isDefined()) {
+                if (model.hasDefined(OCSP.getName())) {
                     builder.setResponderURI(responderUri);
-                    if (!crlNode.isDefined()) {
+                    if (!model.hasDefined(CERTIFICATE_REVOCATION_LIST.getName()) && !model.hasDefined(CERTIFICATE_REVOCATION_LISTS.getName())) {
                         builder.setPreferCrls(false);
                         builder.setNoFallback(true);
                     } else {
@@ -1005,6 +1010,8 @@ class SSLDefinitions {
                         serviceContainer = getRequiredService(context.getServiceRegistry(false), serviceName, KeyManager.class);
                     } else if (serviceName.getParent().getCanonicalName().equals(TRUST_MANAGER_CAPABILITY)) {
                         serviceContainer = getRequiredService(context.getServiceRegistry(false), serviceName, TrustManager.class);
+                    } else {
+                        throw ROOT_LOGGER.invalidServiceNameParent(serviceName.getParent().getCanonicalName());
                     }
                     serviceContainer.getService().stop(null);
                     serviceContainer.getService().start(null);
@@ -1405,7 +1412,7 @@ class SSLDefinitions {
                 ModelNode hostContextMap = HOST_CONTEXT_MAP.resolveModelAttribute(context, model);
 
                 Set<String> keys;
-                if (hostContextMap.isDefined() && (keys = hostContextMap.keys()).size() > 0) {
+                if (hostContextMap.isDefined() && !(keys = hostContextMap.keys()).isEmpty()) {
                     final Map<String, InjectedValue<SSLContext>> sslContextMap = new HashMap<>(keys.size());
                     for (String host : keys) {
                         String sslContextName = hostContextMap.require(host).asString();
@@ -1583,23 +1590,23 @@ class SSLDefinitions {
             final Class<?> providerClazz = SSLDefinitions.class.getClassLoader().loadClass("com.sun.net.ssl.internal.ssl.Provider");
             final Method isFipsMethod = providerClazz.getMethod("isFIPS", new Class[0]);
 
-            return () -> {
-                Object isFips;
-                try {
-                    isFips = isFipsMethod.invoke(null, new Object[0]);
-                } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-                    ROOT_LOGGER.trace("Unable to invoke com.sun.net.ssl.internal.ssl.Provider.isFIPS() method.", e);
-                    return false;
+            Object isFips;
+            try {
+                isFips = isFipsMethod.invoke(null, new Object[0]);
+                if ((isFips instanceof Boolean)) {
+                    return () -> (boolean) isFips;
+                } else {
+                    return () -> false;
                 }
-
-                return isFips != null && isFips instanceof Boolean ? ((Boolean) isFips).booleanValue() : false;
-            };
-
+            } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+                ROOT_LOGGER.trace("Unable to invoke com.sun.net.ssl.internal.ssl.Provider.isFIPS() method.", e);
+                return () -> false;
+            }
         } catch (ClassNotFoundException | NoSuchMethodException | SecurityException e) {
             ROOT_LOGGER.trace("Unable to find com.sun.net.ssl.internal.ssl.Provider.isFIPS() method.", e);
         }
 
-        return Boolean.FALSE::booleanValue;
+        return () -> new SecureRandom().getProvider().getName().toLowerCase().contains("fips");
     }
 
     static ModifiableKeyStoreService getModifiableKeyStoreService(OperationContext context, String keyStoreName) {

@@ -53,7 +53,6 @@ import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SSL
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.STATIC_DISCOVERY;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SUBSYSTEM;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SYSTEM_PROPERTY;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.VAULT;
 import static org.jboss.as.controller.parsing.Namespace.CURRENT;
 import static org.jboss.as.controller.parsing.ParseUtils.isNoNamespaceAttribute;
 import static org.jboss.as.controller.parsing.ParseUtils.missingOneOf;
@@ -200,9 +199,6 @@ final class HostXml_18 extends CommonXml implements ManagementXmlDelegate {
         }
 
         boolean hasCoreServices = modelNode.hasDefined(CORE_SERVICE);
-        if (hasCoreServices && modelNode.get(CORE_SERVICE).hasDefined(VAULT)) {
-            writeVault(writer, modelNode.get(CORE_SERVICE, VAULT));
-        }
 
         if (hasCoreServices) {
             ManagementXml managementXml = ManagementXml.newInstance(CURRENT, this, false);
@@ -342,10 +338,6 @@ final class HostXml_18 extends CommonXml implements ManagementXmlDelegate {
             parsePaths(reader, address, namespace, list, true);
             element = nextElement(reader, namespace);
         }
-        if (element == Element.VAULT) {
-            parseVault(reader, address, namespace, list);
-            element = nextElement(reader, namespace);
-        }
         if (element == Element.MANAGEMENT) {
             ManagementXml managementXml = ManagementXml.newInstance(namespace, this, false);
             managementXml.parseManagement(reader, address, list, true);
@@ -403,10 +395,6 @@ final class HostXml_18 extends CommonXml implements ManagementXmlDelegate {
                         HttpManagementResourceDefinition.SASL_PROTOCOL.parseAndSetParameter(value, addOp, reader);
                         break;
                     }
-                    case SECURITY_REALM: {
-                        HttpManagementResourceDefinition.SECURITY_REALM.parseAndSetParameter(value, addOp, reader);
-                        break;
-                    }
                     case SERVER_NAME: {
                         HttpManagementResourceDefinition.SERVER_NAME.parseAndSetParameter(value, addOp, reader);
                         break;
@@ -450,10 +438,6 @@ final class HostXml_18 extends CommonXml implements ManagementXmlDelegate {
                     }
                     case SASL_PROTOCOL: {
                         NativeManagementResourceDefinition.SASL_PROTOCOL.parseAndSetParameter(value, addOp, reader);
-                        break;
-                    }
-                    case SECURITY_REALM: {
-                        NativeManagementResourceDefinition.SECURITY_REALM.parseAndSetParameter(value, addOp, reader);
                         break;
                     }
                     case SERVER_NAME: {
@@ -872,10 +856,6 @@ final class HostXml_18 extends CommonXml implements ManagementXmlDelegate {
                         DomainControllerWriteAttributeHandler.AUTHENTICATION_CONTEXT.parseAndSetParameter(value, updateDc, reader);
                         break;
                     }
-                    case SECURITY_REALM: {
-                        DomainControllerWriteAttributeHandler.SECURITY_REALM.parseAndSetParameter(value, updateDc, reader);
-                        break;
-                    }
                     case USERNAME: {
                         DomainControllerWriteAttributeHandler.USERNAME.parseAndSetParameter(value, updateDc, reader);
                         break;
@@ -1033,7 +1013,7 @@ final class HostXml_18 extends CommonXml implements ManagementXmlDelegate {
             }
         }
 
-        if (required.size() > 0) {
+        if (!required.isEmpty()) {
             throw missingRequired(reader, required);
         }
 
@@ -1097,7 +1077,7 @@ final class HostXml_18 extends CommonXml implements ManagementXmlDelegate {
             }
         }
 
-        if (required.size() > 0) {
+        if (!required.isEmpty()) {
             throw missingRequired(reader, required);
         }
 
@@ -1128,7 +1108,7 @@ final class HostXml_18 extends CommonXml implements ManagementXmlDelegate {
             }
         }
 
-        if (required.size() > 0) {
+        if (!required.isEmpty()) {
             throw missingRequired(reader, required);
         }
 
@@ -1308,7 +1288,7 @@ final class HostXml_18 extends CommonXml implements ManagementXmlDelegate {
             }
         }
 
-        if (required.size() > 0) {
+        if (!required.isEmpty()) {
             throw missingRequired(reader, required);
         }
 
@@ -1530,7 +1510,6 @@ final class HostXml_18 extends CommonXml implements ManagementXmlDelegate {
             RemoteDomainControllerAddHandler.HOST.marshallAsAttribute(remote, writer);
             RemoteDomainControllerAddHandler.PORT.marshallAsAttribute(remote, writer);
             RemoteDomainControllerAddHandler.AUTHENTICATION_CONTEXT.marshallAsAttribute(remote, writer);
-            RemoteDomainControllerAddHandler.SECURITY_REALM.marshallAsAttribute(remote, writer);
             RemoteDomainControllerAddHandler.USERNAME.marshallAsAttribute(remote, writer);
             RemoteDomainControllerAddHandler.IGNORE_UNUSED_CONFIG.marshallAsAttribute(remote, writer);
             RemoteDomainControllerAddHandler.ADMIN_ONLY_POLICY.marshallAsAttribute(remote, writer);
@@ -1731,7 +1710,6 @@ final class HostXml_18 extends CommonXml implements ManagementXmlDelegate {
         writer.writeStartElement(Element.NATIVE_INTERFACE.getLocalName());
         NativeManagementResourceDefinition.SASL_AUTHENTICATION_FACTORY.marshallAsAttribute(protocol, writer);
         NativeManagementResourceDefinition.SSL_CONTEXT.marshallAsAttribute(protocol, writer);
-        NativeManagementResourceDefinition.SECURITY_REALM.marshallAsAttribute(protocol, writer);
         NativeManagementResourceDefinition.SASL_PROTOCOL.marshallAsAttribute(protocol, writer);
         NativeManagementResourceDefinition.SERVER_NAME.marshallAsAttribute(protocol, writer);
 
@@ -1750,7 +1728,6 @@ final class HostXml_18 extends CommonXml implements ManagementXmlDelegate {
         writer.writeStartElement(Element.HTTP_INTERFACE.getLocalName());
         HttpManagementResourceDefinition.HTTP_AUTHENTICATION_FACTORY.marshallAsAttribute(protocol, writer);
         HttpManagementResourceDefinition.SSL_CONTEXT.marshallAsAttribute(protocol, writer);
-        HttpManagementResourceDefinition.SECURITY_REALM.marshallAsAttribute(protocol, writer);
         HttpManagementResourceDefinition.CONSOLE_ENABLED.marshallAsAttribute(protocol, writer);
         HttpManagementResourceDefinition.ALLOWED_ORIGINS.getMarshaller().marshallAsAttribute(
                 HttpManagementResourceDefinition.ALLOWED_ORIGINS, protocol, true, writer);

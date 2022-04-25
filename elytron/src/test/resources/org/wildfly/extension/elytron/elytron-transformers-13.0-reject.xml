@@ -4,7 +4,7 @@
     TODO Keep the from version up to date with later releases.
  -->
 
-<subsystem xmlns="urn:wildfly:elytron:15.0">
+<subsystem xmlns="urn:wildfly:elytron:15.1">
     <tls>
         <key-stores>
             <key-store name="accounts.keystore">
@@ -52,6 +52,7 @@
         <credential-store name="store1" location="path/to/store_file" >
             <credential-reference clear-text="STOREPASSWORD"/>
         </credential-store>
+        <secret-key-credential-store name="secretkeycredentialstore" path="target/test-classes/org/wildfly/extension/elytron/mysecretkeycredstore.cs" create="true" populate="true" />
     </credential-stores>
     <security-realms>
         <properties-realm name="PropertiesRealmEncodingCharset" hash-charset="GB2312" hash-encoding="base64">
@@ -60,12 +61,16 @@
         <filesystem-realm name="FilesystemRealmEncodingCharset" hash-charset="GB2312" hash-encoding="hex">
             <file  path="filesystem-realm" relative-to="jboss.server.config.dir"/>
         </filesystem-realm>
+        <filesystem-realm name="FilesystemRealmEncrypted" credential-store="secretkeycredentialstore" secret-key="key">
+            <file  path="filesystem-realm" relative-to="jboss.server.config.dir"/>
+        </filesystem-realm>
         <jdbc-realm name="JDBCRealmCharset" hash-charset="GB2312">
             <principal-query sql="SELECT role, password FROM User WHERE username = ?" data-source="ExampleDS"></principal-query>
         </jdbc-realm>
         <ldap-realm name="LDAPRealmEncodingCharset" dir-context="dirContext" hash-encoding="hex" hash-charset="GB2312">
             <identity-mapping rdn-identifier="uid"></identity-mapping>
         </ldap-realm>
+        <jaas-realm name="myJaasRealm" entry="Entry" />
     </security-realms>
     <dir-contexts>
         <dir-context name="dirContext" url="ldap://localhost:11390" principal="uid=server,dc=elytron,dc=wildfly,dc=org" enable-connection-pooling="true">

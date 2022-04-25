@@ -30,6 +30,7 @@ import java.security.Provider;
 import javax.xml.stream.Location;
 import javax.xml.stream.XMLStreamException;
 
+import org.jboss.as.controller.ExpressionResolver;
 import org.jboss.as.controller.OperationFailedException;
 import org.jboss.logging.BasicLogger;
 import org.jboss.logging.Logger;
@@ -332,6 +333,19 @@ public interface ElytronSubsystemMessages extends BasicLogger {
     @Message(id = 43, value = "A cycle has been detected initialising the resources - %s")
     OperationFailedException cycleDetected(String cycle);
 
+    @Message(id = 44, value = "Unexpected name of servicename's parent - %s")
+    IllegalStateException invalidServiceNameParent(String canonicalName);
+
+    @Message(id = 45, value = "Failed to load CallbackHandler from the provided module.")
+    IllegalStateException failedToLoadCallbackhandlerFromProvidedModule();
+
+    @Message(id = 46, value = "Provided path '%s' to JAAS configuration file does not exist.")
+    StartException jaasFileDoesNotExist(final String path);
+
+    @LogMessage(level = WARN)
+    @Message(id = 47, value = "LDAP Realm is configured to use direct-verification and user-password-mapper which is invalid configuration.")
+    void ldapRealmDirectVerificationAndUserPasswordMapper();
+
     /*
      * Credential Store Section.
      */
@@ -377,7 +391,7 @@ public interface ElytronSubsystemMessages extends BasicLogger {
     String updateDependantServices(String alias);
 
     @Message(id = 922, value = "Unable to load credential from credential store.")
-    OperationFailedException unableToLoadCredential(@Cause Throwable cause);
+    ExpressionResolver.ExpressionResolutionUserException unableToLoadCredential(@Cause Throwable cause);
 
     @Message(id = 923, value = "Unable to encrypt the supplied clear text.")
     OperationFailedException unableToEncryptClearText(@Cause Throwable cause);
@@ -640,6 +654,9 @@ public interface ElytronSubsystemMessages extends BasicLogger {
     @Message(id = 1087, value = "Hostname in SNI mapping cannot contain ^ character.")
     OperationFailedException hostContextMapHostnameContainsCaret();
 
+    @Message(id = 1088, value = "Missing certificate authority challenge")
+    AcmeException missingCertificateAuthorityChallenge();
+
     /*
      * Expression Resolver Section
      */
@@ -651,19 +668,34 @@ public interface ElytronSubsystemMessages extends BasicLogger {
     OperationFailedException noResolverWithSpecifiedName(String name);
 
     @Message(id = 1202, value = "A cycle has been detected initialising the expression resolver for '%s' and '%s'.")
-    OperationFailedException cycleDetectedInitialisingExpressionResolver(String firstExpression, String secondExpression);
+    ExpressionResolver.ExpressionResolutionUserException cycleDetectedInitialisingExpressionResolver(String firstExpression, String secondExpression);
 
     @Message(id = 1203, value = "Expression resolver initialisation has already failed.")
-    OperationFailedException expressionResolverInitialisationAlreadyFailed(@Cause Throwable cause);
+    ExpressionResolver.ExpressionResolutionUserException expressionResolverInitialisationAlreadyFailed(@Cause Throwable cause);
 
     @Message(id = 1204, value = "The expression '%s' does not specify a resolver and no default is defined.")
-    OperationFailedException expressionResolutionWithoutResolver(String expression);
+    ExpressionResolver.ExpressionResolutionUserException expressionResolutionWithoutResolver(String expression);
 
     @Message(id = 1205, value = "The expression '%s' specifies a resolver configuration which does not exist.")
-    OperationFailedException invalidResolver(String expression);
+    ExpressionResolver.ExpressionResolutionUserException invalidResolver(String expression);
 
     @Message(id = 1206, value = "Unable to decrypt expression '%s'.")
-    OperationFailedException unableToDecryptExpression(String expression, @Cause Throwable cause);
+    ExpressionResolver.ExpressionResolutionUserException unableToDecryptExpression(String expression, @Cause Throwable cause);
+
+    @Message(id = 1207, value = "Resolution of credential store expressions is not supported in the MODEL stage of operation execution.")
+    ExpressionResolver.ExpressionResolutionServerException modelStageResolutionNotSupported(@Cause IllegalStateException cause);
+
+    @Message(id = 1208, value = "Unable to resolve CredentialStore %s -- %s")
+    ExpressionResolver.ExpressionResolutionServerException unableToResolveCredentialStore(String storeName, String details, @Cause Exception cause);
+
+    @Message(id = 1209, value = "Unable to initialize CredentialStore %s -- %s")
+    ExpressionResolver.ExpressionResolutionUserException unableToInitializeCredentialStore(String storeName, String details, @Cause Exception cause);
+
+    @Message(id = 1210, value = "Initialisation of an %s without an active management OperationContext is not allowed.")
+    ExpressionResolver.ExpressionResolutionServerException illegalNonManagementInitialization(Class<?> initialzingClass);
+
+    @Message(id = 1211, value = "Unable to load the credential store.")
+    OperationFailedException unableToLoadCredentialStore(@Cause Throwable cause);
 
     /*
      * Don't just add new errors to the end of the file, there may be an appropriate section above for the resource.

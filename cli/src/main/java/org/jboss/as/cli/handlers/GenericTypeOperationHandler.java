@@ -302,10 +302,10 @@ public class GenericTypeOperationHandler extends BatchModeCommandHandler {
                 }
                 DefaultOperationRequestAddress address = new DefaultOperationRequestAddress();
                 if(isDependsOnProfile() && ctx.isDomainMode()) {
-                    final String profileName = profile.getValue(ctx.getParsedCommandLine());
                     if(profile == null) {
                         return Collections.emptyList();
                     }
+                    final String profileName = profile.getValue(ctx.getParsedCommandLine());
                     address.toNode(Util.PROFILE, profileName);
                 }
                 for(OperationRequestAddress.Node node : getRequiredAddress()) {
@@ -1341,7 +1341,7 @@ public class GenericTypeOperationHandler extends BatchModeCommandHandler {
 
             return composite;
         }
-    };
+    }
 
     class OpHandler extends ActionHandler {
 

@@ -58,10 +58,8 @@ import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -148,7 +146,6 @@ import org.jboss.as.domain.controller.HostConnectionInfo.Event;
 import org.jboss.as.domain.controller.HostRegistrations;
 import org.jboss.as.domain.controller.LocalHostControllerInfo;
 import org.jboss.as.domain.controller.SlaveRegistrationException;
-import org.jboss.as.domain.controller.logging.DomainControllerLogger;
 import org.jboss.as.domain.controller.operations.ApplyExtensionsHandler;
 import org.jboss.as.domain.controller.operations.DomainModelIncludesValidator;
 import org.jboss.as.domain.controller.operations.coordination.PrepareStepHandler;
@@ -187,7 +184,6 @@ import org.jboss.as.server.RuntimeExpressionResolver;
 import org.jboss.as.server.controller.resources.VersionModelInitializer;
 import org.jboss.as.server.deployment.ContentCleanerService;
 import org.jboss.as.server.mgmt.UndertowHttpManagementService;
-import org.jboss.as.server.services.security.AbstractVaultReader;
 import org.jboss.dmr.ModelNode;
 import org.jboss.msc.service.Service;
 import org.jboss.msc.service.ServiceBuilder;
@@ -238,7 +234,6 @@ public class DomainModelControllerService extends AbstractControllerService impl
     private final PrepareStepHandler prepareStepHandler;
     private final BootstrapListener bootstrapListener;
     private ManagementResourceRegistration modelNodeRegistration;
-    private final AbstractVaultReader vaultReader;
     private final ContentRepository contentRepository;
     private final ExtensionRegistry hostExtensionRegistry;
     private final ExtensionRegistry extensionRegistry;
@@ -278,8 +273,6 @@ public class DomainModelControllerService extends AbstractControllerService impl
         final ConcurrentMap<String, ProxyController> hostProxies = new ConcurrentHashMap<String, ProxyController>();
         final Map<String, ProxyController> serverProxies = new ConcurrentHashMap<String, ProxyController>();
         final LocalHostControllerInfoImpl hostControllerInfo = new LocalHostControllerInfoImpl(processState, environment);
-        final AbstractVaultReader vaultReader = loadVaultReaderService();
-        ROOT_LOGGER.debugf("Using VaultReader %s", vaultReader);
         final ContentRepository contentRepository = ContentRepository.Factory.create(environment.getDomainContentDir(), environment.getDomainTempDir());
         ContentRepository.Factory.addService(serviceTarget, contentRepository);
         final IgnoredDomainResourceRegistry ignoredRegistry = new IgnoredDomainResourceRegistry(hostControllerInfo);
@@ -292,14 +285,15 @@ public class DomainModelControllerService extends AbstractControllerService impl
         final ExtensionRegistry extensionRegistry = new ExtensionRegistry(processType, runningModeControl, auditLogger, authorizer, securityIdentitySupplier, hostControllerInfoAccessor);
         final PrepareStepHandler prepareStepHandler = new PrepareStepHandler(hostControllerInfo,
                 hostProxies, serverProxies, ignoredRegistry, extensionRegistry);
-        final ExpressionResolver expressionResolver = new RuntimeExpressionResolver(vaultReader);
+        final RuntimeExpressionResolver expressionResolver = new RuntimeExpressionResolver();
+        hostExtensionRegistry.setResolverExtensionRegistry(expressionResolver);
         final DomainHostExcludeRegistry domainHostExcludeRegistry = new DomainHostExcludeRegistry();
         HostControllerEnvironmentService.addService(environment, serviceTarget);
 
         final ServiceBuilder<?> sb = serviceTarget.addService(SERVICE_NAME);
         final Supplier<ExecutorService> esSupplier = sb.requires(HC_EXECUTOR_SERVICE_NAME);
         final DomainModelControllerService service = new DomainModelControllerService(esSupplier, environment, runningModeControl, processState,
-                hostControllerInfo, contentRepository, hostProxies, serverProxies, prepareStepHandler, vaultReader,
+                hostControllerInfo, contentRepository, hostProxies, serverProxies, prepareStepHandler,
                 ignoredRegistry, bootstrapListener, pathManager, expressionResolver, new DomainDelegatingResourceDefinition(),
                 hostExtensionRegistry, extensionRegistry, auditLogger, authorizer, securityIdentitySupplier, capabilityRegistry, domainHostExcludeRegistry);
         sb.setInstance(service);
@@ -321,7 +315,6 @@ public class DomainModelControllerService extends AbstractControllerService impl
                                          final ConcurrentMap<String, ProxyController> hostProxies,
                                          final Map<String, ProxyController> serverProxies,
                                          final PrepareStepHandler prepareStepHandler,
-                                         final AbstractVaultReader vaultReader,
                                          final IgnoredDomainResourceRegistry ignoredRegistry,
                                          final BootstrapListener bootstrapListener,
                                          final PathManagerService pathManager,
@@ -335,7 +328,7 @@ public class DomainModelControllerService extends AbstractControllerService impl
                                          final CapabilityRegistry capabilityRegistry,
                                          final DomainHostExcludeRegistry domainHostExcludeRegistry) {
         super(executorService, null, environment.getProcessType(), runningModeControl, null, processState,
-                rootResourceDefinition, prepareStepHandler, new RuntimeExpressionResolver(vaultReader), auditLogger, authorizer, securityIdentitySupplier, capabilityRegistry);
+                rootResourceDefinition, prepareStepHandler, expressionResolver, auditLogger, authorizer, securityIdentitySupplier, capabilityRegistry, null);
         this.environment = environment;
         this.runningModeControl = runningModeControl;
         this.processState = processState;
@@ -348,7 +341,6 @@ public class DomainModelControllerService extends AbstractControllerService impl
         this.serverProxies = serverProxies;
         this.prepareStepHandler = prepareStepHandler;
         this.prepareStepHandler.setServerInventory(new DelegatingServerInventory());
-        this.vaultReader = vaultReader;
         this.ignoredRegistry = ignoredRegistry;
         this.bootstrapListener = bootstrapListener;
         this.hostExtensionRegistry = hostExtensionRegistry;
@@ -582,6 +574,7 @@ public class DomainModelControllerService extends AbstractControllerService impl
                 new RuntimeCapabilityRegistration(PROCESS_STATE_NOTIFIER_CAPABILITY, CapabilityScope.GLOBAL, new RegistrationPoint(PathAddress.EMPTY_ADDRESS, null)));
         capabilityReg.registerCapability(
                 new RuntimeCapabilityRegistration(CONSOLE_AVAILABILITY_CAPABILITY, CapabilityScope.GLOBAL, new RegistrationPoint(PathAddress.EMPTY_ADDRESS, null)));
+
         // Record the core capabilities with the root MRR so reads of it will show it as their provider
         // This also gets them recorded as 'possible capabilities' in the capability registry
         rootRegistration.registerCapability(PATH_MANAGER_CAPABILITY);
@@ -906,11 +899,26 @@ public class DomainModelControllerService extends AbstractControllerService impl
                     Notification notification = new Notification(ModelDescriptionConstants.BOOT_COMPLETE_NOTIFICATION, PathAddress.pathAddress(PathElement.pathElement(CORE_SERVICE, MANAGEMENT),
                             PathElement.pathElement(SERVICE, MANAGEMENT_OPERATIONS)), ControllerLogger.MGMT_OP_LOGGER.bootComplete());
                     getNotificationSupport().emit(notification);
-                    bootstrapListener.printBootStatistics();
+
+                    String message;
+                    String hostConfig = environment.getHostConfigurationFile().getMainFile().getName();
+                    if (environment.getDomainConfigurationFile() != null) { //for slave HC is null
+                        String domainConfig = environment.getDomainConfigurationFile().getMainFile().getName();
+                        message = ROOT_LOGGER.configFilesInUse(domainConfig, hostConfig);
+                    } else {
+                        message = ROOT_LOGGER.configFileInUse(hostConfig);
+                    }
+                    bootstrapListener.printBootStatistics(message);
                 }
             } else {
                 // Die!
-                String failed = ROOT_LOGGER.unsuccessfulBoot();
+                String message;
+                if (environment.getDomainConfigurationFile() != null) {
+                    message = ROOT_LOGGER.configFilesInUse(environment.getDomainConfigurationFile().getMainFile().getName(), environment.getHostConfigurationFile().getMainFile().getName());
+                } else {
+                    message = ROOT_LOGGER.configFileInUse(environment.getHostConfigurationFile().getMainFile().getName());
+                }
+                String failed = ROOT_LOGGER.unsuccessfulBoot(message);
                 ROOT_LOGGER.fatal(failed);
                 bootstrapListener.bootFailure(failed);
 
@@ -927,7 +935,7 @@ public class DomainModelControllerService extends AbstractControllerService impl
         boolean ok = boot(Collections.singletonList(registerModelControllerServiceInitializationBootStep(context)), true, true);
         // until a host is added with the host add op, there is no root description provider delegate. We just install a non-resolving one for now, so the
         // CLI doesn't get a lot of NPEs from :read-resource-description etc.
-        SimpleResourceDefinition def = new SimpleResourceDefinition(new SimpleResourceDefinition.Parameters(null, new NonResolvingResourceDescriptionResolver()));
+        SimpleResourceDefinition def = new SimpleResourceDefinition(new SimpleResourceDefinition.Parameters(null, NonResolvingResourceDescriptionResolver.INSTANCE));
         rootResourceDefinition.setFakeDelegate(def);
         // just initialize the persister and return, we have to wait for /host=foo:add()
         hostControllerConfigurationPersister.initializeDomainConfigurationPersister(false);
@@ -990,7 +998,6 @@ public class DomainModelControllerService extends AbstractControllerService impl
                 extensionRegistry,
                 hostControllerInfo,
                 hostControllerInfo.getAuthenticationContext(),
-                hostControllerInfo.getRemoteDomainControllerSecurityRealm(),
                 remoteFileRepository,
                 contentRepository,
                 ignoredRegistry,
@@ -1117,7 +1124,7 @@ public class DomainModelControllerService extends AbstractControllerService impl
         hostModelRegistration =
                 HostModelUtil.createHostRegistry(hostName, root, hostControllerConfigurationPersister, environment, runningModeControl,
                         localFileRepository, hostControllerInfo, new DelegatingServerInventory(), remoteFileRepository, contentRepository,
-                        this, hostExtensionRegistry, extensionRegistry, vaultReader, ignoredRegistry, processState, pathManager, authorizer,
+                        this, hostExtensionRegistry, extensionRegistry, ignoredRegistry, processState, pathManager, authorizer,
                         securityIdentitySupplier, getAuditLogger(), getBootErrorCollector());
     }
 
@@ -1372,25 +1379,6 @@ public class DomainModelControllerService extends AbstractControllerService impl
         }
     }
 
-    private static AbstractVaultReader loadVaultReaderService() {
-        final ServiceLoader<AbstractVaultReader> serviceLoader = ServiceLoader.load(AbstractVaultReader.class,
-                DomainModelControllerService.class.getClassLoader());
-        final Iterator<AbstractVaultReader> it = serviceLoader.iterator();
-        // TODO WFCORE-114 get rid of catching/suppressing errors once we have a complete impl in WFCORE
-        ServiceConfigurationError sce = null;
-        try {
-            while (it.hasNext()) {
-                return it.next();
-            }
-        } catch (ServiceConfigurationError e) {
-            sce = e;
-        }
-        if (sce != null) {
-            DomainControllerLogger.HOST_CONTROLLER_LOGGER.debugf(sce, "Cannot instantiate provider of service %s", AbstractVaultReader.class);
-        }
-        return null;
-    }
-
     @Override
     public ExtensionRegistry getExtensionRegistry() {
         return extensionRegistry;
@@ -1570,9 +1558,6 @@ public class DomainModelControllerService extends AbstractControllerService impl
             super.setResult(inventory);
         }
 
-        private void setFailure(final Throwable t) {
-            super.setFailed(t);
-        }
     }
 
     // this is a placeholder object used in certain cases where the live inventory is not available

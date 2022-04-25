@@ -27,6 +27,7 @@ import static org.wildfly.extension.elytron.ElytronDescriptionConstants.BCRYPT_M
 import static org.wildfly.extension.elytron.ElytronDescriptionConstants.CERTIFICATE_AUTHORITY;
 import static org.wildfly.extension.elytron.ElytronDescriptionConstants.FILESYSTEM_REALM;
 import static org.wildfly.extension.elytron.ElytronDescriptionConstants.CERTIFICATE_REVOCATION_LISTS;
+import static org.wildfly.extension.elytron.ElytronDescriptionConstants.CREDENTIAL_STORE;
 import static org.wildfly.extension.elytron.ElytronDescriptionConstants.FILE_AUDIT_LOG;
 import static org.wildfly.extension.elytron.ElytronDescriptionConstants.HASH_CHARSET;
 import static org.wildfly.extension.elytron.ElytronDescriptionConstants.HASH_ENCODING;
@@ -39,6 +40,7 @@ import static org.wildfly.extension.elytron.ElytronDescriptionConstants.PROPERTI
 import static org.wildfly.extension.elytron.ElytronDescriptionConstants.SALTED_SIMPLE_DIGEST_MAPPER;
 import static org.wildfly.extension.elytron.ElytronDescriptionConstants.SALT_ENCODING;
 import static org.wildfly.extension.elytron.ElytronDescriptionConstants.SCRAM_MAPPER;
+import static org.wildfly.extension.elytron.ElytronDescriptionConstants.SECRET_KEY;
 import static org.wildfly.extension.elytron.ElytronDescriptionConstants.SIMPLE_DIGEST_MAPPER;
 import static org.wildfly.extension.elytron.ElytronDescriptionConstants.SIZE_ROTATING_FILE_AUDIT_LOG;
 import static org.wildfly.extension.elytron.ElytronDescriptionConstants.SYNCHRONIZED;
@@ -48,6 +50,7 @@ import static org.wildfly.extension.elytron.ElytronExtension.ELYTRON_12_0_0;
 import static org.wildfly.extension.elytron.ElytronExtension.ELYTRON_13_0_0;
 import static org.wildfly.extension.elytron.ElytronExtension.ELYTRON_14_0_0;
 import static org.wildfly.extension.elytron.ElytronExtension.ELYTRON_15_0_0;
+import static org.wildfly.extension.elytron.ElytronExtension.ELYTRON_15_1_0;
 import static org.wildfly.extension.elytron.ElytronExtension.ELYTRON_1_2_0;
 import static org.wildfly.extension.elytron.ElytronExtension.ELYTRON_2_0_0;
 import static org.wildfly.extension.elytron.ElytronExtension.ELYTRON_3_0_0;
@@ -98,7 +101,9 @@ public final class ElytronSubsystemTransformers implements ExtensionTransformerR
     public void registerTransformers(SubsystemTransformerRegistration registration) {
         ChainedTransformationDescriptionBuilder chainedBuilder = TransformationDescriptionBuilder.Factory.createChainedSubystemInstance(registration.getCurrentSubsystemVersion());
 
-        // 15.0.0 (WildFly 25) to 14.0.0 (WildFly 24)
+        // 15.1.0 (WildFly 26.1) to 15.0.0 (WildFly 26)
+        from15_1(chainedBuilder);
+        // 15.0.0 (WildFly 26) to 14.0.0 (WildFly 25)
         from15(chainedBuilder);
         // 14.0.0 (WildFly 24) to 13.0.0 (WildFly 23)
         from14(chainedBuilder);
@@ -127,12 +132,38 @@ public final class ElytronSubsystemTransformers implements ExtensionTransformerR
         // 2.0.0 (WildFly 12) to 1.2.0, (WildFly 11 and EAP 7.1.0)
         from2(chainedBuilder);
 
-        chainedBuilder.buildAndRegister(registration, new ModelVersion[] { ELYTRON_14_0_0, ELYTRON_13_0_0, ELYTRON_12_0_0, ELYTRON_11_0_0, ELYTRON_10_0_0, ELYTRON_9_0_0,
+        chainedBuilder.buildAndRegister(registration, new ModelVersion[] { ELYTRON_15_0_0, ELYTRON_14_0_0, ELYTRON_13_0_0, ELYTRON_12_0_0, ELYTRON_11_0_0, ELYTRON_10_0_0, ELYTRON_9_0_0,
                 ELYTRON_8_0_0, ELYTRON_7_0_0, ELYTRON_6_0_0, ELYTRON_5_0_0, ELYTRON_4_0_0, ELYTRON_3_0_0, ELYTRON_2_0_0, ELYTRON_1_2_0 });
+    }
+
+    private static void from15_1(ChainedTransformationDescriptionBuilder chainedBuilder) {
+        ResourceTransformationDescriptionBuilder builder = chainedBuilder.createBuilder(ELYTRON_15_1_0, ELYTRON_15_0_0);
+
+        builder.addChildResource(PathElement.pathElement(ElytronDescriptionConstants.KEY_STORE))
+        .addOperationTransformationOverride(ElytronDescriptionConstants.READ_ALIAS)
+        .setDiscard(DiscardAttributeChecker.UNDEFINED, ModifiableKeyStoreDecorator.ReadAliasHandler.VERBOSE)
+        .addRejectCheck(new RejectAttributeChecker.SimpleRejectAttributeChecker(ModelNode.FALSE), ElytronDescriptionConstants.VERBOSE)
+        .end();
+
+        builder.addChildResource(PathElement.pathElement(ElytronDescriptionConstants.KEY_STORE))
+        .addOperationTransformationOverride(ElytronDescriptionConstants.READ_ALIASES)
+        .setDiscard(DiscardAttributeChecker.UNDEFINED, ModifiableKeyStoreDecorator.ReadAliasesHandler.VERBOSE)
+        .setDiscard(DiscardAttributeChecker.UNDEFINED, ModifiableKeyStoreDecorator.ReadAliasesHandler.RECURSIVE)
+        .addRejectCheck(new RejectAttributeChecker.SimpleRejectAttributeChecker(ModelNode.TRUE), ElytronDescriptionConstants.VERBOSE)
+        .addRejectCheck(new RejectAttributeChecker.SimpleRejectAttributeChecker(ModelNode.TRUE), ElytronDescriptionConstants.RECURSIVE)
+        .end();
+
+        builder.addChildResource(PathElement.pathElement(FILESYSTEM_REALM))
+                .getAttributeBuilder()
+                .setDiscard(DiscardAttributeChecker.UNDEFINED, CREDENTIAL_STORE)
+                .setDiscard(DiscardAttributeChecker.UNDEFINED, SECRET_KEY)
+                .addRejectCheck(RejectAttributeChecker.DEFINED, CREDENTIAL_STORE)
+                .addRejectCheck(RejectAttributeChecker.DEFINED, SECRET_KEY);
     }
 
     private static void from15(ChainedTransformationDescriptionBuilder chainedBuilder) {
         ResourceTransformationDescriptionBuilder builder = chainedBuilder.createBuilder(ELYTRON_15_0_0, ELYTRON_14_0_0);
+        builder.rejectChildResource(PathElement.pathElement(ElytronDescriptionConstants.JAAS_REALM));
 
     }
 

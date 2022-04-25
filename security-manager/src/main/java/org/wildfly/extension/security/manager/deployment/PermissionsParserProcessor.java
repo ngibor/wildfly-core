@@ -41,6 +41,7 @@ import org.jboss.modules.ModuleIdentifier;
 import org.jboss.modules.ModuleLoader;
 import org.jboss.modules.security.PermissionFactory;
 import org.jboss.vfs.VirtualFile;
+import org.wildfly.common.xml.XMLInputFactoryUtil;
 
 /**
  * This class implements a {@link DeploymentUnitProcessor} that parses security permission files that might be
@@ -127,7 +128,7 @@ public class PermissionsParserProcessor implements DeploymentUnitProcessor {
             } else {
                 ModuleSpecification parentSpecification = deploymentUnit.getParent().getAttachment(Attachments.MODULE_SPECIFICATION);
                 List<PermissionFactory> factories = parentSpecification.getPermissionFactories();
-                if (factories != null && factories.size() > 0) {
+                if (factories != null && !factories.isEmpty()) {
                     // parent deployment contains permissions: subdeployments inherit those permissions.
                     for (PermissionFactory factory : factories) {
                         moduleSpecification.addPermissionFactory(factory);
@@ -135,10 +136,6 @@ public class PermissionsParserProcessor implements DeploymentUnitProcessor {
                 }
             }
         }
-    }
-
-    @Override
-    public void undeploy(final DeploymentUnit context) {
     }
 
     /**
@@ -161,7 +158,7 @@ public class PermissionsParserProcessor implements DeploymentUnitProcessor {
         InputStream inputStream = null;
         try {
             inputStream = file.openStream();
-            final XMLInputFactory inputFactory = XMLInputFactory.newInstance();
+            final XMLInputFactory inputFactory = XMLInputFactoryUtil.create();
             final ExpressionStreamReaderDelegate expressionStreamReaderDelegate = new ExpressionStreamReaderDelegate(inputFactory.createXMLStreamReader(inputStream), exprExpandFunction);
             return PermissionsParser.parse(expressionStreamReaderDelegate, loader, identifier);
         } catch (Exception e) {

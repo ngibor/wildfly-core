@@ -8,7 +8,7 @@
     <parent>
         <groupId>org.wildfly.core</groupId>
         <artifactId>wildfly-core-testsuite</artifactId>
-        <version>17.0.0.Beta3-SNAPSHOT</version>
+        <version>19.0.0.Beta8-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -22,7 +22,6 @@
         <wildfly.home>${project.basedir}/target/wildfly-core</wildfly.home>
         <version.javax.enterprise>1.2</version.javax.enterprise>
 
-        <ts.enable.elytron.cli>enable-elytron.cli</ts.enable.elytron.cli>
         <ts.config.elytron.cli.no.embedded>configure-elytron.cli</ts.config.elytron.cli.no.embedded>
         <ts.config.elytron.cli>${project.build.directory}/${ts.config.elytron.cli.no.embedded}</ts.config.elytron.cli>
     </properties>
@@ -49,8 +48,8 @@
             <artifactId>wildfly-threads</artifactId>
         </dependency>
         <dependency>
-            <groupId>log4j</groupId>
-            <artifactId>log4j</artifactId>
+            <groupId>ch.qos.reload4j</groupId>
+            <artifactId>reload4j</artifactId>
         </dependency>
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
@@ -63,11 +62,6 @@
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpmime</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.wildfly.core</groupId>
-            <artifactId>wildfly-core-vault-test-galleon-pack</artifactId>
-            <type>pom</type>
         </dependency>
         <dependency>
             <groupId>org.wildfly.core</groupId>
@@ -229,7 +223,7 @@
                                 <feature-packs>
                                     <feature-pack>
                                         <groupId>org.wildfly.core</groupId>
-                                        <artifactId>wildfly-core-vault-test-galleon-pack</artifactId>
+                                        <artifactId>wildfly-core-galleon-pack</artifactId>
                                         <version>${project.version}</version>
                                         <inherit-configs>false</inherit-configs>
                                         <included-configs>
@@ -276,7 +270,6 @@
                          <configuration>
                              <offline>true</offline>
                              <scripts>
-                                 <script>${ts.enable.elytron.cli}</script>
                                  <script>${ts.config.elytron.cli}</script>
                              </scripts>
                              <jboss-home>${project.build.directory}/wildfly-core</jboss-home>
@@ -346,7 +339,7 @@
                                      <feature-packs>
                                          <feature-pack>
                                              <groupId>org.wildfly.core</groupId>
-                                             <artifactId>wildfly-core-vault-test-galleon-pack</artifactId>
+                                             <artifactId>wildfly-core-galleon-pack</artifactId>
                                              <!--<artifactId>wildfly-core-galleon-pack</artifactId>-->
                                              <version>${project.version}</version>
                                              <inherit-configs>false</inherit-configs>
@@ -354,7 +347,6 @@
                                              <!-- Specifically include patching -->
                                              <included-packages>
                                                  <name>org.jboss.as.patching.cli</name>
-                                                 <name>org.picketbox</name>
                                              </included-packages>
                                              <excluded-packages>
                                                  <name>product.conf</name>
@@ -456,13 +448,12 @@
                             <feature-packs>
                                 <feature-pack>
                                     <groupId>org.wildfly.core</groupId>
-                                    <artifactId>wildfly-core-vault-test-galleon-pack</artifactId>
+                                    <artifactId>wildfly-core-galleon-pack</artifactId>
                                     <!--<artifactId>wildfly-core-galleon-pack</artifactId>-->
                                     <version>${project.version}</version>
                                     <!-- Specifically include patching -->
                                     <included-packages>
                                         <name>org.jboss.as.patching.cli</name>
-                                        <name>org.picketbox</name>
                                     </included-packages>
                                     <excluded-packages>
                                         <name>product.conf</name>

@@ -19,17 +19,18 @@
  * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
  * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
  */
-
 package org.wildfly.core.launcher;
 
 import static org.wildfly.core.launcher.logger.LauncherMessages.MESSAGES;
 
+import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.StringJoiner;
 
 import org.wildfly.core.launcher.Arguments.Argument;
 
@@ -125,7 +126,9 @@ public class StandaloneCommandBuilder extends AbstractCommandBuilder<StandaloneC
                     }
                     break;
                 case SECURITY_MANAGER_PROP:
-                    setUseSecurityManager(true);
+                    // [WFCORE-5778] java.security.manager system property with value "allow" detected.
+                    // It doesn't mean SM is going to be installed but it indicates SM can be installed dynamically.
+                    setUseSecurityManager(isJavaSecurityManagerConfigured(argument));
                     break;
                 default:
                     javaOpts.add(argument);
@@ -181,7 +184,6 @@ public class StandaloneCommandBuilder extends AbstractCommandBuilder<StandaloneC
         this.javaOpts.clear();
         return addJavaOptions(javaOpts);
     }
-
 
     /**
      * Sets the JVM arguments to use. This overrides any default JVM arguments that would normally be added and ignores
@@ -330,7 +332,7 @@ public class StandaloneCommandBuilder extends AbstractCommandBuilder<StandaloneC
      * Sets the debug JPDA remote socket debugging argument.
      *
      * @param suspend {@code true} to suspend otherwise {@code false}
-     * @param port    the port to listen on
+     * @param port the port to listen on
      *
      * @return the builder
      */
@@ -486,7 +488,7 @@ public class StandaloneCommandBuilder extends AbstractCommandBuilder<StandaloneC
     /**
      * Adds a security property to be passed to the server.
      *
-     * @param key   the property key
+     * @param key the property key
      * @param value the property value
      *
      * @return the builder
@@ -523,6 +525,18 @@ public class StandaloneCommandBuilder extends AbstractCommandBuilder<StandaloneC
         return this;
     }
 
+    public StandaloneCommandBuilder setYamlFiles(Path[] yamlFiles) {
+        if (yamlFiles == null || yamlFiles.length == 0) {
+            return this;
+        }
+        StringJoiner joiner = new StringJoiner(File.pathSeparator);
+        for (Path yamlFile : yamlFiles) {
+            joiner.add(yamlFile.toAbsolutePath().toString());
+        }
+        addServerArg("--yaml", joiner.toString());
+        return this;
+    }
+
     @Override
     public List<String> buildArguments() {
         final List<String> cmd = new ArrayList<>();
@@ -534,6 +548,9 @@ public class StandaloneCommandBuilder extends AbstractCommandBuilder<StandaloneC
         cmd.addAll(getJavaOptions());
         if (environment.getJvm().isModular()) {
             cmd.addAll(DEFAULT_MODULAR_VM_ARGUMENTS);
+        }
+        if (environment.getJvm().enhancedSecurityManagerAvailable()) {
+            cmd.add(SECURITY_MANAGER_PROP_WITH_ALLOW_VALUE);
         }
         // Add these to JVM level system properties
         addSystemPropertyArg(cmd, HOME_DIR, getWildFlyHome());

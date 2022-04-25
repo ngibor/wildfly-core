@@ -22,6 +22,7 @@
 
 package org.jboss.as.controller.logging;
 
+import static org.jboss.logging.Logger.Level.DEBUG;
 import static org.jboss.logging.Logger.Level.ERROR;
 import static org.jboss.logging.Logger.Level.INFO;
 import static org.jboss.logging.Logger.Level.WARN;
@@ -41,8 +42,10 @@ import java.util.concurrent.CancellationException;
 import javax.xml.namespace.QName;
 import javax.xml.stream.Location;
 import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
 import javax.xml.stream.XMLStreamWriter;
 
+import org.jboss.as.controller.ExpressionResolver;
 import org.jboss.as.controller.ModelVersion;
 import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationFailedException;
@@ -76,6 +79,8 @@ import org.jboss.modules.ModuleLoadException;
 import org.jboss.modules.ModuleNotFoundException;
 import org.jboss.msc.service.ServiceName;
 import org.jboss.msc.service.StartException;
+import org.yaml.snakeyaml.error.Mark;
+import org.yaml.snakeyaml.nodes.NodeId;
 
 /**
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
@@ -192,6 +197,15 @@ public interface ControllerLogger extends BasicLogger {
      */
     @LogMessage(level = ERROR)
     void failedToCloseResource(@Cause Throwable cause, XMLStreamWriter writer);
+
+    /**
+     * Logs an error message indicating to failure to close the resource represented by the {@code reader} parameter.
+     *
+     * @param cause  the cause of the error.
+     * @param reader the resource.
+     */
+    @LogMessage(level = ERROR)
+    void failedToCloseResource(@Cause Throwable cause, XMLStreamReader reader);
 
     /**
      * Logs an error message indicating a failure to persist configuration change.
@@ -2384,7 +2398,7 @@ public interface ControllerLogger extends BasicLogger {
      * @return an {@link OperationFailedException} for the caller
      */
     @Message(id = 210, value = "Caught SecurityException attempting to resolve expression '%s' -- %s")
-    String noPermissionToResolveExpression(ModelNode toResolve, SecurityException e);
+    ExpressionResolver.ExpressionResolutionUserException noPermissionToResolveExpression(ModelNode toResolve, SecurityException e);
 
     /**
      * Creates an exception message indicating an expression could not be resolved due to no corresponding system property
@@ -2394,7 +2408,7 @@ public interface ControllerLogger extends BasicLogger {
      * @return an {@link OperationFailedException} for the caller
      */
     @Message(id = 211, value = "Cannot resolve expression '%s'")
-    OperationFailedException cannotResolveExpression(String toResolve);
+    ExpressionResolver.ExpressionResolutionUserException cannotResolveExpression(String toResolve);
 
     /**
      * Creates an exception indicating the resource is a duplicate.
@@ -3233,7 +3247,7 @@ public interface ControllerLogger extends BasicLogger {
     String unsupportedUsageOfExpression();
 
     @Message(id = 370, value="Incomplete expression: %s")
-    OperationFailedException incompleteExpression(String expression);
+    ExpressionResolver.ExpressionResolutionUserException incompleteExpression(String expression);
 
     @Message(id = 371, value="The element '%s' is no longer supported, please use '%s' instead")
     XMLStreamException unsupportedElement(QName name, @Param Location location, String supportedElement);
@@ -3654,4 +3668,49 @@ public interface ControllerLogger extends BasicLogger {
 
     @Message(id = 484, value = "Attribute definition of attribute '%s' is null")
     IllegalArgumentException invalidAttributeDefinition(String attributeName);
+
+    @Message(id = 485, value = "Error parsing yaml file %s")
+    IllegalArgumentException failedToParseYamlConfigurationFile(String path, @Cause Throwable throwable);
+
+    @Message(id = 486, value = "Missing yaml file %s")
+    IllegalArgumentException missingYamlFile(String path);
+
+    @LogMessage(level = DEBUG)
+    @Message(id = 487, value = "It took %s ms to load and parse the yaml files")
+    void loadingYamlFiles(long duration);
+
+    @LogMessage(level = WARN)
+    @Message(id = 488, value = "No registration found for address %s - Ignoring the subtree")
+    void noResourceRegistered(String address);
+
+    @Message(id = 489, value = "Can't undefine attribute %s since there is no resource at %s")
+    IllegalArgumentException noResourceForUndefiningAttribute(String attribute, String address);
+
+    @LogMessage(level = WARN)
+    @Message(id = 490, value = "You have defined a resource for address %s without any attributes, doing nothing")
+    void noAttributeSetForAddress(String address);
+
+    @LogMessage(level = WARN)
+    @Message(id = 491, value = "We have an unexpected value %s for address %s and name %s")
+    void unexpectedValueForResource(Object value, String address, String name);
+
+    @LogMessage(level = WARN)
+    @Message(id = 492, value = "Couldn't find a resource registration for address %s with current registration %s")
+    void noResourceRegistered(String address, String registration);
+
+    @Message(id = 493, value = "The attribute %s hasn't a valueType properly defined.")
+    UnsupportedOperationException missingListAttributeValueType(String name);
+
+    @Message(id = 494, value = "Resolution of extension expression '%s' is not allowed at this point.")
+    ExpressionResolver.ExpressionResolutionServerException resolverExtensionExpressionsNotAllowed(String expression);
+
+    @Message(id = NONE, value = "While constructing a mapping; %s; expected a mapping for merging, but found %s")
+    String errorConstructingYAMLMapping(Mark mark, NodeId node);
+
+    /**
+     * Instructions for the {@link YamlConfigurationExtension#YAML_CONFIG} command line argument.
+     * @return Instructions for the {@link YamlConfigurationExtension#YAML_CONFIG} command line argument.
+     */
+    @Message(id = Message.NONE, value = "The yaml configuration files for customizing the configuration. Paths can be absolute, relative to the current execution directory or relative to the standalone configuration directory.")
+    String argYaml();
 }

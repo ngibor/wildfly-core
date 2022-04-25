@@ -17,37 +17,71 @@
  */
 package org.wildfly.extension.elytron;
 
+import org.jboss.as.controller.client.helpers.ClientConstants;
 import org.jboss.as.subsystem.test.AbstractSubsystemBaseTest;
 import org.jboss.as.subsystem.test.KernelServices;
+import org.jboss.dmr.ModelNode;
 import org.jboss.msc.service.ServiceName;
 import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Test;
+import org.wildfly.common.iteration.ByteIterator;
+import org.wildfly.common.iteration.CodePointIterator;
+import org.wildfly.security.WildFlyElytronProvider;
+import org.wildfly.security.auth.permission.LoginPermission;
 import org.wildfly.security.auth.principal.NamePrincipal;
+import org.wildfly.security.auth.realm.JaasSecurityRealm;
 import org.wildfly.security.auth.server.ModifiableRealmIdentity;
 import org.wildfly.security.auth.server.ModifiableSecurityRealm;
 import org.wildfly.security.auth.server.RealmIdentity;
+import org.wildfly.security.auth.server.SecurityDomain;
 import org.wildfly.security.auth.server.SecurityRealm;
+import org.wildfly.security.auth.server.ServerAuthenticationContext;
+import org.wildfly.security.authz.Attributes;
+import org.wildfly.security.authz.AuthorizationIdentity;
+import org.wildfly.security.authz.MapAttributes;
 import org.wildfly.security.credential.Credential;
 import org.wildfly.security.credential.PasswordCredential;
 import org.wildfly.security.evidence.PasswordGuessEvidence;
 import org.wildfly.security.password.PasswordFactory;
 import org.wildfly.security.password.interfaces.BCryptPassword;
 import org.wildfly.security.password.interfaces.ClearPassword;
+import org.wildfly.security.password.interfaces.DigestPassword;
 import org.wildfly.security.password.interfaces.OneTimePassword;
 import org.wildfly.security.password.spec.ClearPasswordSpec;
+import org.wildfly.security.password.spec.DigestPasswordAlgorithmSpec;
 import org.wildfly.security.password.spec.EncryptablePasswordSpec;
 import org.wildfly.security.password.spec.IteratedSaltedPasswordAlgorithmSpec;
 import org.wildfly.security.password.spec.OneTimePasswordSpec;
 
+import java.io.File;
 import java.io.IOException;
-
+import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.security.AccessController;
 import java.security.Principal;
+import java.security.PrivilegedAction;
+import java.security.Provider;
+import java.security.Security;
 import java.security.spec.KeySpec;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.FAILED;
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.OUTCOME;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 /**
  * @author <a href="mailto:jkalina@redhat.com">Jan Kalina</a>
@@ -58,6 +92,12 @@ public class RealmsTestCase extends AbstractSubsystemBaseTest {
         super(ElytronExtension.SUBSYSTEM_NAME, new ElytronExtension());
     }
 
+    private static final Provider wildFlyElytronProvider = new WildFlyElytronProvider();
+
+    @BeforeClass
+    public static void setUp() {
+        AccessController.doPrivileged((PrivilegedAction<Integer>) () -> Security.insertProviderAt(wildFlyElytronProvider, 1));
+    }
     @Override
     protected String getSubsystemXml() throws IOException {
         return readResource("realms-test.xml");
@@ -79,11 +119,14 @@ public class RealmsTestCase extends AbstractSubsystemBaseTest {
         ServiceName serviceName2 = Capabilities.SECURITY_REALM_RUNTIME_CAPABILITY.getCapabilityServiceName("ClearPropertyRealm");
         SecurityRealm securityRealm2 = (SecurityRealm) services.getContainer().getService(serviceName2).getValue();
         testAbstractPropertyRealm(securityRealm2);
+        testExternalModificationPropertyRealm(securityRealm2, "users-clear.properties", "user999", "password999", "password999");
 
         // base64 encoded using UTF-8
         ServiceName serviceName3 = Capabilities.SECURITY_REALM_RUNTIME_CAPABILITY.getCapabilityServiceName("HashedPropertyRealmBase64Encoded");
         SecurityRealm securityRealm3 = (SecurityRealm) services.getContainer().getService(serviceName3).getValue();
         performHashedFileTest(securityRealm3, "elytron","passwd12#$");
+        testExternalModificationPropertyRealm(securityRealm3, "users-hashedbase64.properties", "user999",
+                "password999", generateHashedPassword("user999", "password999", "ManagementRealm"));
 
         // base64 encoded using charset GB2312
         ServiceName serviceName4 = Capabilities.SECURITY_REALM_RUNTIME_CAPABILITY.getCapabilityServiceName("HashedPropertyRealmBase64EncodedCharset");
@@ -101,12 +144,12 @@ public class RealmsTestCase extends AbstractSubsystemBaseTest {
         RealmIdentity identity1 = realm.getRealmIdentity(fromName(username));
         Assert.assertTrue(identity1.exists());
         Assert.assertTrue(identity1.verifyEvidence(new PasswordGuessEvidence(password.toCharArray())));
-        Assert.assertFalse(identity1.verifyEvidence(new PasswordGuessEvidence("password2".toCharArray())));
+        assertFalse(identity1.verifyEvidence(new PasswordGuessEvidence("password2".toCharArray())));
         identity1.dispose();
 
         RealmIdentity identity9 = realm.getRealmIdentity(fromName("user9"));
-        Assert.assertFalse(identity9.exists());
-        Assert.assertFalse(identity9.verifyEvidence(new PasswordGuessEvidence("password9".toCharArray())));
+        assertFalse(identity9.exists());
+        assertFalse(identity9.verifyEvidence(new PasswordGuessEvidence("password9".toCharArray())));
         identity9.dispose();
     }
 
@@ -117,7 +160,7 @@ public class RealmsTestCase extends AbstractSubsystemBaseTest {
         RealmIdentity identity1 = securityRealm.getRealmIdentity(fromName("user1"));
         Assert.assertTrue(identity1.exists());
         Assert.assertTrue(identity1.verifyEvidence(new PasswordGuessEvidence("password1".toCharArray())));
-        Assert.assertFalse(identity1.verifyEvidence(new PasswordGuessEvidence("password2".toCharArray())));
+        assertFalse(identity1.verifyEvidence(new PasswordGuessEvidence("password2".toCharArray())));
         identity1.dispose();
 
         RealmIdentity identity2 = securityRealm.getRealmIdentity(fromName("user2"));
@@ -126,9 +169,56 @@ public class RealmsTestCase extends AbstractSubsystemBaseTest {
         identity2.dispose();
 
         RealmIdentity identity9 = securityRealm.getRealmIdentity(fromName("user9"));
-        Assert.assertFalse(identity9.exists());
-        Assert.assertFalse(identity9.verifyEvidence(new PasswordGuessEvidence("password9".toCharArray())));
+        assertFalse(identity9.exists());
+        assertFalse(identity9.verifyEvidence(new PasswordGuessEvidence("password9".toCharArray())));
         identity9.dispose();
+    }
+
+    private String generateHashedPassword(String username, String password, String realm) throws Exception {
+        EncryptablePasswordSpec passwordSpec = new EncryptablePasswordSpec(password.toCharArray(), new DigestPasswordAlgorithmSpec(username, realm), StandardCharsets.UTF_8);
+        PasswordFactory passwordFactory = PasswordFactory.getInstance(DigestPassword.ALGORITHM_DIGEST_MD5);
+        DigestPassword digestPwd = passwordFactory.generatePassword(passwordSpec).castAs(DigestPassword.class);
+        return ByteIterator.ofBytes(digestPwd.getDigest()).base64Encode().drainToString();
+    }
+
+    /* Performs a manual modification of the properties file and checks if it is refreshed */
+    private void testExternalModificationPropertyRealm(SecurityRealm securityRealm, String fileName, String username, String password, String hash) throws Exception {
+        // assert the username principal does not exist in the realm
+        RealmIdentity identity = securityRealm.getRealmIdentity(fromName(username));
+        assertFalse("Identity " + username + " already exists in the realm", identity.exists());
+        identity.dispose();
+        long current = System.currentTimeMillis();
+
+        URL url = getClass().getResource(fileName);
+        Assert.assertNotNull("The properties file " + fileName + " does not exist", url);
+        Path propsPath = Paths.get(url.toURI());
+        byte[] backup = Files.readAllBytes(propsPath);
+        try {
+            // modify the properties file adding the username and hashed password
+            String line = System.lineSeparator() + username + "=" + hash;
+            Files.write(propsPath, line.getBytes(StandardCharsets.UTF_8), StandardOpenOption.APPEND);
+            File file = propsPath.toFile();
+            if (current >= file.lastModified()) {
+                boolean modified = false;
+                for (int i = 0; !modified && i < 10; i++) {
+                    TimeUnit.MILLISECONDS.sleep(200);
+                    file.setLastModified(System.currentTimeMillis());
+                    modified = current < file.lastModified();
+                }
+                if (!modified) {
+                    // file system is not updating the last modified time, so test won't work
+                    Assert.fail("File System is not updating the modification timestamp");
+                }
+            }
+
+            // assert that the property realm detects the external modification
+            identity = securityRealm.getRealmIdentity(fromName(username));
+            Assert.assertTrue("Identity " + username + " is not detected after external modification", identity.exists());
+            Assert.assertTrue("Invalid password for the added identity", identity.verifyEvidence(new PasswordGuessEvidence(password.toCharArray())));
+            identity.dispose();
+        } finally {
+            Files.write(Paths.get(url.toURI()), backup, StandardOpenOption.TRUNCATE_EXISTING);
+        }
     }
 
     /* Test filesystem-realm with existing filesystem from resources, without relative-to */
@@ -176,18 +266,99 @@ public class RealmsTestCase extends AbstractSubsystemBaseTest {
 
     }
 
+    /**
+     * Test the filesystem realm can handle identities with different types of encrypted passwords and attributes. Also
+     * ensures a pre-assigned SecretKey as well as a newly generated SecretKey work.
+     */
+    @Test
+    public void testFilesystemRealmEncrypted() throws Exception {
+        KernelServices services = super.createKernelServicesBuilder(new TestEnvironment()).setSubsystemXmlResource("realms-test.xml").build();
+        if (!services.isSuccessfulBoot()) {
+            Assert.fail(services.getBootError().toString());
+        }
+
+        ServiceName serviceName = Capabilities.SECURITY_REALM_RUNTIME_CAPABILITY.getCapabilityServiceName("FilesystemRealm5");
+        ModifiableSecurityRealm securityRealm = (ModifiableSecurityRealm) services.getContainer().getService(serviceName).getValue();
+        ServiceName serviceNameGeneratedKey = Capabilities.SECURITY_REALM_RUNTIME_CAPABILITY.getCapabilityServiceName("FilesystemRealm6");
+        ModifiableSecurityRealm securityRealmGeneratedKey = (ModifiableSecurityRealm) services.getContainer().getService(serviceNameGeneratedKey).getValue();
+
+        // Test Clear Encrypted Password
+        Assert.assertNotNull(securityRealm);
+        char[] password = "secretPassword".toCharArray();
+        RealmIdentity identityClear = securityRealm.getRealmIdentity(fromName("plainUser"));
+        Assert.assertTrue(identityClear.exists());
+        Assert.assertTrue(identityClear.verifyEvidence(new PasswordGuessEvidence(password)));
+        Assert.assertFalse(identityClear.verifyEvidence(new PasswordGuessEvidence("secretPassword123".toCharArray())));
+        identityClear.dispose();
+
+        // Test BCrypt Hashed Encrypted Password
+        RealmIdentity identityBcrypt = securityRealm.getRealmIdentity(fromName("plainUser1"));
+        Assert.assertTrue(identityBcrypt.exists());
+        Assert.assertTrue(identityBcrypt.verifyEvidence(new PasswordGuessEvidence(password)));
+        Assert.assertFalse(identityBcrypt.verifyEvidence(new PasswordGuessEvidence("secretPassword123".toCharArray())));
+        identityBcrypt.dispose();
+
+        // Test encrypted attributes
+        MapAttributes newAttributes = new MapAttributes();
+        newAttributes.addFirst("name", "plainUser");
+        newAttributes.addAll("roles", Arrays.asList("Employee", "Manager", "Admin"));
+
+        RealmIdentity identityAttribute = securityRealm.getRealmIdentity(fromName("attributeUser"));
+        Assert.assertTrue(identityAttribute.exists());
+        AuthorizationIdentity authorizationIdentity = identityAttribute.getAuthorizationIdentity();
+        Attributes existingAttributes = authorizationIdentity.getAttributes();
+        identityAttribute.dispose();
+
+        assertEquals(newAttributes.size(), existingAttributes.size());
+        assertTrue(newAttributes.get("name").containsAll(existingAttributes.get("name")));
+        assertTrue(newAttributes.get("roles").containsAll(existingAttributes.get("roles")));
+
+        // Test OTP and BCrypt Encrypted Passwords
+        RealmIdentity identityEverything = securityRealm.getRealmIdentity(fromName("plainUserEverything"));
+        byte[] hash = CodePointIterator.ofString("505d889f90085847").hexDecode().drain();
+        String seed = "ke1234";
+        Assert.assertTrue(identityEverything.exists());
+        Assert.assertTrue(identityEverything.verifyEvidence(new PasswordGuessEvidence(password)));
+        OneTimePassword otp = identityEverything.getCredential(PasswordCredential.class, OneTimePassword.ALGORITHM_OTP_SHA1).getPassword(OneTimePassword.class);
+        assertNotNull(otp);
+        assertEquals(OneTimePassword.ALGORITHM_OTP_SHA1, otp.getAlgorithm());
+        assertArrayEquals(hash, otp.getHash());
+        assertEquals(seed, otp.getSeed());
+        identityEverything.dispose();
+
+        // Test creating new encrypted realm with identity
+        List<Credential> credentials = new LinkedList<>();
+        PasswordFactory factory = PasswordFactory.getInstance(ClearPassword.ALGORITHM_CLEAR);
+        ClearPassword clearPassword = (ClearPassword) factory.generatePassword(new ClearPasswordSpec(password));
+        credentials.add(new PasswordCredential(clearPassword));
+
+        ModifiableRealmIdentity identityEmpty = securityRealmGeneratedKey.getRealmIdentityForUpdate(fromName("emptyIdentity"));
+        Assert.assertFalse(identityEmpty.exists());
+        identityEmpty.create();
+        Assert.assertTrue(identityEmpty.exists());
+        identityEmpty.setCredentials(credentials);
+        identityEmpty.dispose();
+
+        ModifiableRealmIdentity identityEmpty2 = securityRealmGeneratedKey.getRealmIdentityForUpdate(fromName("emptyIdentity"));
+        Assert.assertTrue(identityEmpty2.exists());
+        Assert.assertTrue(identityEmpty2.verifyEvidence(new PasswordGuessEvidence(password)));
+        identityEmpty.delete();
+        Assert.assertFalse(identityEmpty.exists());
+        identityEmpty.dispose();
+    }
+
     private void testAbstractFilesystemRealm(SecurityRealm securityRealm, String username, String password) throws Exception {
         Assert.assertNotNull(securityRealm);
 
         RealmIdentity identity1 = securityRealm.getRealmIdentity(fromName(username));
         Assert.assertTrue(identity1.exists());
         Assert.assertTrue(identity1.verifyEvidence(new PasswordGuessEvidence(password.toCharArray())));
-        Assert.assertFalse(identity1.verifyEvidence(new PasswordGuessEvidence("password2".toCharArray())));
+        assertFalse(identity1.verifyEvidence(new PasswordGuessEvidence("password2".toCharArray())));
         identity1.dispose();
 
         RealmIdentity identity9 = securityRealm.getRealmIdentity(fromName("user9"));
-        Assert.assertFalse(identity9.exists());
-        Assert.assertFalse(identity9.verifyEvidence(new PasswordGuessEvidence("password9".toCharArray())));
+        assertFalse(identity9.exists());
+        assertFalse(identity9.verifyEvidence(new PasswordGuessEvidence("password9".toCharArray())));
         identity9.dispose();
     }
 
@@ -200,7 +371,7 @@ public class RealmsTestCase extends AbstractSubsystemBaseTest {
 
         // create identity
         ModifiableRealmIdentity identity1 = securityRealm.getRealmIdentityForUpdate(fromName("createdUser"));
-        Assert.assertFalse(identity1.exists());
+        assertFalse(identity1.exists());
         identity1.create();
         Assert.assertTrue(identity1.exists());
 
@@ -228,7 +399,7 @@ public class RealmsTestCase extends AbstractSubsystemBaseTest {
 
         // delete identity
         identity1.delete();
-        Assert.assertFalse(identity1.exists());
+        assertFalse(identity1.exists());
         identity1.dispose();
     }
 
@@ -304,6 +475,98 @@ public class RealmsTestCase extends AbstractSubsystemBaseTest {
         identity1.dispose();
     }
 
+    @Test
+    public void testJAASRealm() throws Exception {
+        try {
+            KernelServices services = super.createKernelServicesBuilder(new TestEnvironment()).setSubsystemXmlResource("realms-test.xml").build();
+            if (!services.isSuccessfulBoot()) {
+                Assert.fail(services.getBootError().toString());
+            }
+
+            JaasSecurityRealm securityRealm;
+            if (!(JdkUtils.isIbmJdk())) {
+                ServiceName serviceName = Capabilities.SECURITY_REALM_RUNTIME_CAPABILITY.getCapabilityServiceName("myJaasRealm");
+                securityRealm = (JaasSecurityRealm) services.getContainer().getService(serviceName).getValue();
+                Assert.assertNotNull(securityRealm);
+            } else {
+                // IBM JDK 8 does not recognize default policy type "JavaLoginConfig" so the path to JAAS configuration file must be provided via system property
+                System.setProperty("java.security.auth.login.config", RealmsTestCase.class.getResource("jaas-login.config").toString());
+                securityRealm = new JaasSecurityRealm("Entry1");
+            }
+
+            RealmIdentity identity1 = securityRealm.getRealmIdentity(new NamePrincipal("user"));
+
+            // verify password
+            assertFalse(identity1.verifyEvidence(new PasswordGuessEvidence("incorrectPassword".toCharArray())));
+            Assert.assertTrue(identity1.verifyEvidence(new PasswordGuessEvidence("userPassword".toCharArray())));
+
+            Assert.assertTrue(identity1.exists());
+
+            RealmIdentity identity2 = securityRealm.getRealmIdentity(new NamePrincipal("nonexistentUser"));
+            // verify password
+            assertFalse(identity2.verifyEvidence(new PasswordGuessEvidence("password".toCharArray())));
+            // even nonexistent identity will return true for exists() method,
+            // because we have no way of finding this out, but at least the authorization identity always exists
+            Assert.assertTrue(identity2.exists());
+            Assert.assertTrue(identity2.getAuthorizationIdentity().getAttributes().isEmpty());
+
+            SecurityDomain securityDomain = SecurityDomain.builder().setDefaultRealmName("default").addRealm("default", securityRealm).build()
+                    .setPermissionMapper(((permissionMappable, roles) -> LoginPermission.getInstance()))
+                    .build();
+
+            ServerAuthenticationContext sac1 = securityDomain.createNewAuthenticationContext();
+            sac1.setAuthenticationPrincipal(new NamePrincipal("user"));
+            assertFalse(sac1.verifyEvidence(new PasswordGuessEvidence("incorrect".toCharArray())));
+            assertTrue(sac1.verifyEvidence(new PasswordGuessEvidence("userPassword".toCharArray())));
+            Assert.assertTrue(sac1.authorize());
+            Assert.assertFalse(sac1.getAuthorizedIdentity().getAttributes().containsKey("Roles"));
+            Assert.assertTrue(sac1.getAuthorizedIdentity().getAttributes().containsKey("NamePrincipal"));
+            Assert.assertFalse(sac1.getAuthorizedIdentity().getAttributes().containsKey("NonexistentPrincipal"));
+            Assert.assertEquals("User", sac1.getAuthorizedIdentity().getAttributes().getFirst("NamePrincipal"));
+        } finally {
+            System.clearProperty("java.security.auth.login.config");
+        }
+    }
+
+    @Test
+    public void testEntryInJAASConfigMustBeProvided() throws Exception {
+        KernelServices services = super.createKernelServicesBuilder(new TestEnvironment()).setSubsystemXmlResource("realms-test.xml").build();
+        if (!services.isSuccessfulBoot()) {
+            Assert.fail(services.getBootError().toString());
+        }
+        ModelNode operation = new ModelNode();
+        operation.get(ClientConstants.OP_ADDR)
+                .add("subsystem", "elytron").add("jaas-realm", "my-jaas-realm");
+        operation.get(ClientConstants.OP).set(ClientConstants.ADD);
+        // operation.get(ElytronDescriptionConstants.ENTRY).set("any_entry");
+        ModelNode response = services.executeOperation(operation);
+        // operation will fail because path does not exist
+        if (! response.get(OUTCOME).asString().equals(FAILED)) {
+            Assert.fail(response.toJSONString(false));
+        }
+        Assert.assertTrue(response.asString().contains("'entry' may not be null"));
+    }
+
+    @Test
+    public void testPathToJAASConfigFileDoesNotExist() throws Exception {
+        KernelServices services = super.createKernelServicesBuilder(new TestEnvironment()).setSubsystemXmlResource("realms-test.xml").build();
+        if (!services.isSuccessfulBoot()) {
+            Assert.fail(services.getBootError().toString());
+        }
+        ModelNode operation = new ModelNode();
+        operation.get(ClientConstants.OP_ADDR)
+                .add("subsystem", "elytron").add("jaas-realm", "my-jaas-realm");
+        operation.get(ClientConstants.OP).set(ClientConstants.ADD);
+        operation.get(ElytronDescriptionConstants.ENTRY).set("any_entry");
+        operation.get(ElytronDescriptionConstants.PATH).set("this/is/non/existen/path");
+        ModelNode response = services.executeOperation(operation);
+        // operation will fail because path does not exist
+        if (! response.get(OUTCOME).asString().equals(FAILED)) {
+            Assert.fail(response.toJSONString(false));
+        }
+        Assert.assertTrue(response.asString().contains("JAAS configuration file does not exist."));
+    }
+
     static void testModifiability(ModifiableSecurityRealm securityRealm) throws Exception {
 
         // obtain original count of identities
@@ -312,7 +575,7 @@ public class RealmsTestCase extends AbstractSubsystemBaseTest {
 
         // create identity
         ModifiableRealmIdentity identity1 = securityRealm.getRealmIdentityForUpdate(fromName("createdUser"));
-        Assert.assertFalse(identity1.exists());
+        assertFalse(identity1.exists());
         identity1.create();
         Assert.assertTrue(identity1.exists());
 
@@ -350,7 +613,7 @@ public class RealmsTestCase extends AbstractSubsystemBaseTest {
         // delete identity
         identity1 = securityRealm.getRealmIdentityForUpdate(fromName("createdUser"));
         identity1.delete();
-        Assert.assertFalse(identity1.exists());
+        assertFalse(identity1.exists());
         identity1.dispose();
     }
 

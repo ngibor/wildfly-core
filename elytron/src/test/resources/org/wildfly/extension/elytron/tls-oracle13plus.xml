@@ -1,5 +1,5 @@
 <!-- for needs of SaslTestCase and KeyStoresTestCase -->
-<subsystem xmlns="urn:wildfly:elytron:15.0" default-ssl-context="ClientSslContextNoAuth">
+<subsystem xmlns="urn:wildfly:elytron:15.1" default-ssl-context="ClientSslContextNoAuth">
     <providers>
         <provider-loader name="ManagerProviderLoader" class-names="sun.security.ssl.SunJSSE"/>
         <provider-loader name="openssl" module="org.wildfly.openssl"/>
@@ -77,6 +77,9 @@
             </trust-manager>
             <trust-manager name="trust-with-crl-dp" algorithm="PKIX" key-store="ElytronCaTruststore">
                 <certificate-revocation-list />
+            </trust-manager>
+            <trust-manager name="trust-with-crl-dp-deprecated-max-cert-path" algorithm="PKIX" key-store="ElytronCaTruststore">
+                <certificate-revocation-list maximum-cert-path="1"/>
             </trust-manager>
             <trust-manager name="trust-with-crls-dp" algorithm="PKIX" key-store="ElytronCaTruststore">
                 <certificate-revocation-lists />

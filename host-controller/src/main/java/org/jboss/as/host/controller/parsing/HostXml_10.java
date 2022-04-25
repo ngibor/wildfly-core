@@ -53,6 +53,7 @@ import static org.jboss.as.controller.parsing.ParseUtils.requireNoContent;
 import static org.jboss.as.controller.parsing.ParseUtils.requireNoNamespaceAttribute;
 import static org.jboss.as.controller.parsing.ParseUtils.unexpectedAttribute;
 import static org.jboss.as.controller.parsing.ParseUtils.unexpectedElement;
+import static org.jboss.as.host.controller.logging.HostControllerLogger.ROOT_LOGGER;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -287,8 +288,7 @@ final class HostXml_10 extends CommonXml implements ManagementXmlDelegate {
                         break;
                     }
                     case SECURITY_REALM: {
-                        HttpManagementResourceDefinition.SECURITY_REALM.parseAndSetParameter(value, addOp, reader);
-                        break;
+                        throw ROOT_LOGGER.securityRealmReferencesUnsupported();
                     }
                     case SERVER_NAME: {
                         HttpManagementResourceDefinition.SERVER_NAME.parseAndSetParameter(value, addOp, reader);
@@ -336,8 +336,7 @@ final class HostXml_10 extends CommonXml implements ManagementXmlDelegate {
                         break;
                     }
                     case SECURITY_REALM: {
-                        NativeManagementResourceDefinition.SECURITY_REALM.parseAndSetParameter(value, addOp, reader);
-                        break;
+                        throw ROOT_LOGGER.securityRealmReferencesUnsupported();
                     }
                     case SERVER_NAME: {
                         NativeManagementResourceDefinition.SERVER_NAME.parseAndSetParameter(value, addOp, reader);
@@ -691,8 +690,7 @@ final class HostXml_10 extends CommonXml implements ManagementXmlDelegate {
                         break;
                     }
                     case SECURITY_REALM: {
-                        DomainControllerWriteAttributeHandler.SECURITY_REALM.parseAndSetParameter(value, updateDc, reader);
-                        break;
+                        throw ROOT_LOGGER.securityRealmReferencesUnsupported();
                     }
                     case USERNAME: {
                         DomainControllerWriteAttributeHandler.USERNAME.parseAndSetParameter(value, updateDc, reader);
@@ -851,7 +849,7 @@ final class HostXml_10 extends CommonXml implements ManagementXmlDelegate {
             }
         }
 
-        if (required.size() > 0) {
+        if (!required.isEmpty()) {
             throw missingRequired(reader, required);
         }
 
@@ -915,7 +913,7 @@ final class HostXml_10 extends CommonXml implements ManagementXmlDelegate {
             }
         }
 
-        if (required.size() > 0) {
+        if (!required.isEmpty()) {
             throw missingRequired(reader, required);
         }
 
@@ -946,7 +944,7 @@ final class HostXml_10 extends CommonXml implements ManagementXmlDelegate {
             }
         }
 
-        if (required.size() > 0) {
+        if (!required.isEmpty()) {
             throw missingRequired(reader, required);
         }
 
@@ -1126,7 +1124,7 @@ final class HostXml_10 extends CommonXml implements ManagementXmlDelegate {
             }
         }
 
-        if (required.size() > 0) {
+        if (!required.isEmpty()) {
             throw missingRequired(reader, required);
         }
 

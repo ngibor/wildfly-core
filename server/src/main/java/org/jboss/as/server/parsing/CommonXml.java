@@ -260,7 +260,7 @@ public abstract class CommonXml implements XMLElementReader<List<ModelNode>> {
 
         if (profileNode.hasDefined(SUBSYSTEM)) {
             Set<String> subsystemNames = profileNode.get(SUBSYSTEM).keys();
-            if (subsystemNames.size() > 0) {
+            if (!subsystemNames.isEmpty()) {
                 // establish traditional 'logging then alphabetical' ordering
                 // note that logging first is just tradition; it's not necessary technically
                 Set<String> alphabetical = new TreeSet<>(subsystemNames);
@@ -300,10 +300,6 @@ public abstract class CommonXml implements XMLElementReader<List<ModelNode>> {
     protected static void writeContentItem(final XMLExtendedStreamWriter writer, final ModelNode contentItem)
             throws XMLStreamException {
         DeploymentsXml.writeContentItem(writer, contentItem);
-    }
-
-    protected void writeVault(XMLExtendedStreamWriter writer, ModelNode vault) throws XMLStreamException {
-        vaultXml.writeVault(writer, vault);
     }
 
     /**

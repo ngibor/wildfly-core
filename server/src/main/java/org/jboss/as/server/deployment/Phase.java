@@ -208,6 +208,7 @@ public enum Phase {
     @Deprecated
     public static final int STRUCTURE_OSGI_METADATA                     = 0x0430;
     public static final int STRUCTURE_REMOUNT_EXPLODED                  = 0x0450;
+    public static final int STRUCTURE_ELYTRON_EXPRESSION_RESOLVER       = 0x0480;
     public static final int STRUCTURE_EE_SPEC_DESC_PROPERTY_REPLACEMENT = 0x0500;
     public static final int STRUCTURE_EE_JBOSS_DESC_PROPERTY_REPLACEMENT= 0x0550;
     public static final int STRUCTURE_EE_EJB_ANNOTATION_PROPERTY_REPLACEMENT  =  0x0555;
@@ -215,7 +216,8 @@ public enum Phase {
     public static final int STRUCTURE_EE_DEPLOYMENT_PROPERTY_RESOLVER   = 0x0561;
     public static final int STRUCTURE_EE_VAULT_PROPERTY_RESOLVER        = 0x0562;
     public static final int STRUCTURE_EE_SYSTEM_PROPERTY_RESOLVER       = 0x0563;
-    public static final int STRUCTURE_EE_PROPERTY_RESOLVER              = 0x0564;
+    public static final int STRUCTURE_EE_FUNCTIONAL_RESOLVERS           = 0x0564;
+    public static final int STRUCTURE_EE_PROPERTY_RESOLVER              = 0x0565;
     public static final int STRUCTURE_JDBC_DRIVER                       = 0x0600;
     public static final int STRUCTURE_RAR                               = 0x0700;
     public static final int STRUCTURE_WAR_DEPLOYMENT_INIT               = 0x0800;
@@ -277,7 +279,7 @@ public enum Phase {
     public static final int STRUCTURE_DEFERRED_DEPLOYMENT_OVERLAY       = 0xF000; //needs to run after all structure processors
 
     // PARSE
-    public static final int PARSE_SECURITY_ENABLED                      = 0x0080;
+    //public static final int PARSE_SECURITY_ENABLED                      = 0x0080;
     public static final int PARSE_EE_MODULE_NAME                        = 0x0100;
     public static final int PARSE_EJB_DEFAULT_DISTINCT_NAME             = 0x0110;
     public static final int PARSE_EAR_SUBDEPLOYMENTS_ISOLATION_DEFAULT  = 0x0200;
@@ -429,7 +431,7 @@ public enum Phase {
     public static final int DEPENDENCIES_WELD                           = 0x0A00;
     public static final int DEPENDENCIES_SEAM                           = 0x0A01;
     public static final int DEPENDENCIES_WS                             = 0x0C00;
-    public static final int DEPENDENCIES_SECURITY                       = 0x0C50;
+    //public static final int DEPENDENCIES_SECURITY                       = 0x0C50;
     public static final int DEPENDENCIES_ELYTRON                        = 0x0C51;
     public static final int DEPENDENCIES_ELYTRON_EE_SECURITY            = 0x0C52;
     public static final int DEPENDENCIES_JAXRS                          = 0x0D00;
@@ -491,12 +493,12 @@ public enum Phase {
     @Deprecated
     public static final int CONFIGURE_RESOLVE_BUNDLE                    = 0x0100;
     public static final int CONFIGURE_JDBC_DRIVER_MANAGER_ADAPTER       = 0x0180;
+    public static final int CONFIGURE_DISTRIBUTABLE_WEB                 = 0x0190;
     public static final int CONFIGURE_MODULE_SPEC                       = 0x0200;
     public static final int CONFIGURE_DEFERRED_PHASE                    = 0x0300;
     public static final int CONFIGURE_SINGLETON_DEPLOYMENT              = 0x0400;
     public static final int CONFIGURE_AUTHENTICATION_CONTEXT            = 0x0500;
     public static final int CONFIGURE_DEFAULT_SSL_CONTEXT               = 0x0580;
-    public static final int CONFIGURE_DISTRIBUTABLE_WEB                 = 0x0600;
 
     // FIRST_MODULE_USE
     public static final int FIRST_MODULE_USE_PERSISTENCE_CLASS_FILE_TRANSFORMER = 0x0100; // need to be before POST_MODULE_REFLECTION_INDEX

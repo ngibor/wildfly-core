@@ -129,7 +129,6 @@ import org.jboss.as.server.mgmt.domain.HostControllerConnectionService;
 import org.jboss.as.server.moduleservice.ExtensionIndexService;
 import org.jboss.as.server.moduleservice.ExternalModule;
 import org.jboss.as.server.moduleservice.ServiceModuleLoader;
-import org.jboss.as.server.services.security.AbstractVaultReader;
 import org.jboss.as.server.suspend.SuspendController;
 import org.jboss.dmr.ModelNode;
 import org.jboss.msc.service.Service;
@@ -173,9 +172,9 @@ public final class ServerService extends AbstractControllerService {
     private final ControlledProcessState processState;
     private final RunningModeControl runningModeControl;
     private volatile ExtensibleConfigurationPersister extensibleConfigurationPersister;
-    private final AbstractVaultReader vaultReader;
     private final ServerDelegatingResourceDefinition rootResourceDefinition;
     private final SuspendController suspendController;
+    private final RuntimeExpressionResolver expressionResolver;
     public static final String SERVER_NAME = "server";
 
     static final String SUSPEND_CONTROLLER_CAPABILITY_NAME = "org.wildfly.server.suspend-controller";
@@ -198,18 +197,19 @@ public final class ServerService extends AbstractControllerService {
                           final Supplier<ControllerInstabilityListener> instabilityListener,
                           final Bootstrap.Configuration configuration, final ControlledProcessState processState,
                           final OperationStepHandler prepareStep, final BootstrapListener bootstrapListener, final ServerDelegatingResourceDefinition rootResourceDefinition,
-                          final RunningModeControl runningModeControl, final AbstractVaultReader vaultReader, final ManagedAuditLogger auditLogger,
-                          final DelegatingConfigurableAuthorizer authorizer, final ManagementSecurityIdentitySupplier securityIdentitySupplier, final CapabilityRegistry capabilityRegistry,
-                          final SuspendController suspendController) {
+                          final RunningModeControl runningModeControl, final ManagedAuditLogger auditLogger,
+                          final DelegatingConfigurableAuthorizer authorizer, final ManagementSecurityIdentitySupplier securityIdentitySupplier,
+                          final CapabilityRegistry capabilityRegistry, final SuspendController suspendController, final RuntimeExpressionResolver expressionResolver) {
         super(executorService, instabilityListener, getProcessType(configuration.getServerEnvironment()), runningModeControl, null, processState,
-                rootResourceDefinition, prepareStep, new RuntimeExpressionResolver(vaultReader), auditLogger, authorizer, securityIdentitySupplier, capabilityRegistry);
+                rootResourceDefinition, prepareStep, expressionResolver, auditLogger, authorizer, securityIdentitySupplier, capabilityRegistry,
+                configuration.getServerEnvironment().getConfigurationExtension());
         this.configuration = configuration;
         this.bootstrapListener = bootstrapListener;
         this.processState = processState;
         this.runningModeControl = runningModeControl;
-        this.vaultReader = vaultReader;
         this.rootResourceDefinition = rootResourceDefinition;
         this.suspendController = suspendController;
+        this.expressionResolver = expressionResolver;
     }
 
     static ProcessType getProcessType(ServerEnvironment serverEnvironment) {
@@ -225,7 +225,7 @@ public final class ServerService extends AbstractControllerService {
      */
     public static void addService(final ServiceTarget serviceTarget, final Bootstrap.Configuration configuration,
                                   final ControlledProcessState processState, final BootstrapListener bootstrapListener,
-                                  final RunningModeControl runningModeControl, final AbstractVaultReader vaultReader, final ManagedAuditLogger auditLogger,
+                                  final RunningModeControl runningModeControl, final ManagedAuditLogger auditLogger,
                                   final DelegatingConfigurableAuthorizer authorizer, final ManagementSecurityIdentitySupplier securityIdentitySupplier,
                                   final SuspendController suspendController) {
 
@@ -253,6 +253,8 @@ public final class ServerService extends AbstractControllerService {
                 .install();
 
         final CapabilityRegistry capabilityRegistry = configuration.getCapabilityRegistry();
+        final RuntimeExpressionResolver expressionResolver = new RuntimeExpressionResolver();
+        configuration.getExtensionRegistry().setResolverExtensionRegistry(expressionResolver);
 
         ServiceBuilder<?> serviceBuilder = serviceTarget.addService(Services.JBOSS_SERVER_CONTROLLER);
         final boolean allowMCE = configuration.getServerEnvironment().isAllowModelControllerExecutor();
@@ -260,7 +262,7 @@ public final class ServerService extends AbstractControllerService {
         final boolean isDomainEnv = configuration.getServerEnvironment().getLaunchType() == ServerEnvironment.LaunchType.DOMAIN;
         final Supplier<ControllerInstabilityListener> cilSupplier = isDomainEnv ? serviceBuilder.requires(HostControllerConnectionService.SERVICE_NAME) : null;
         ServerService service = new ServerService(esSupplier, cilSupplier, configuration, processState, null, bootstrapListener, new ServerDelegatingResourceDefinition(),
-                runningModeControl, vaultReader, auditLogger, authorizer, securityIdentitySupplier, capabilityRegistry, suspendController);
+                runningModeControl, auditLogger, authorizer, securityIdentitySupplier, capabilityRegistry, suspendController, expressionResolver);
         serviceBuilder.setInstance(service);
         serviceBuilder.addDependency(DeploymentMountProvider.SERVICE_NAME,DeploymentMountProvider.class, service.injectedDeploymentRepository);
         serviceBuilder.addDependency(ContentRepository.SERVICE_NAME, ContentRepository.class, service.injectedContentRepository);
@@ -284,7 +286,7 @@ public final class ServerService extends AbstractControllerService {
         rootResourceDefinition.setDelegate(
                 new ServerRootResourceDefinition(injectedContentRepository.getValue(),
                         extensibleConfigurationPersister, configuration.getServerEnvironment(), processState,
-                        runningModeControl, vaultReader, configuration.getExtensionRegistry(),
+                        runningModeControl, configuration.getExtensionRegistry(),
                         getExecutorService() != null,
                         (PathManagerService)injectedPathManagerService.getValue(),
                         new DomainServerCommunicationServices.OperationIDUpdater() {
@@ -397,7 +399,7 @@ public final class ServerService extends AbstractControllerService {
                 // Boot but by default don't rollback on runtime failures
                 // TODO replace system property used by tests with something properly configurable for general use
                 // TODO search for uses of "jboss.unsupported.fail-boot-on-runtime-failure" in tests before changing this!!
-                boolean failOnRuntime = Boolean.valueOf(WildFlySecurityManager.getPropertyPrivileged("jboss.unsupported.fail-boot-on-runtime-failure", "false"));
+                boolean failOnRuntime = Boolean.parseBoolean(WildFlySecurityManager.getPropertyPrivileged("jboss.unsupported.fail-boot-on-runtime-failure", "false"));
 
                 // Load the ops
                 List<ModelNode> bootOps = extensibleConfigurationPersister.load();
@@ -427,10 +429,19 @@ public final class ServerService extends AbstractControllerService {
             Notification notification = new Notification(ModelDescriptionConstants.BOOT_COMPLETE_NOTIFICATION, PathAddress.pathAddress(PathElement.pathElement(CORE_SERVICE, MANAGEMENT),
                     PathElement.pathElement(SERVICE, MANAGEMENT_OPERATIONS)), ServerLogger.AS_ROOT_LOGGER.bootComplete());
             getNotificationSupport().emit(notification);
-            bootstrapListener.printBootStatistics();
+            String message = "";
+            if (configuration.getServerEnvironment().getServerConfigurationFile() != null) {
+                String serverConfig = configuration.getServerEnvironment().getServerConfigurationFile().getMainFile().getName();
+                message = ServerLogger.AS_ROOT_LOGGER.serverConfigFileInUse(serverConfig);
+            }
+            bootstrapListener.printBootStatistics(message);
         } else {
             // Die!
-            final String message = ServerLogger.ROOT_LOGGER.unsuccessfulBoot();
+            String messageToAppend = "";
+            if (configuration.getServerEnvironment().getServerConfigurationFile() != null) {
+                messageToAppend = ServerLogger.ROOT_LOGGER.serverConfigFileInUse(configuration.getServerEnvironment().getServerConfigurationFile().getMainFile().getName());
+            }
+            String message = ServerLogger.ROOT_LOGGER.unsuccessfulBoot(messageToAppend);
             bootstrapListener.bootFailure(message);
             SystemExiter.logAndExit(new SystemExiter.ExitLogger() {
                 @Override

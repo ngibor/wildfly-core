@@ -37,18 +37,17 @@ import static org.jboss.as.controller.parsing.ParseUtils.unexpectedElement;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.xml.stream.XMLStreamException;
 
 import org.jboss.as.controller.ExpressionResolver;
 import org.jboss.as.controller.OperationFailedException;
-import org.jboss.as.controller.VaultReader;
 import org.jboss.as.controller.logging.ControllerLogger;
 import org.jboss.as.controller.operations.common.Util;
 import org.jboss.as.controller.parsing.Element;
 import org.jboss.as.controller.parsing.Namespace;
 import org.jboss.as.controller.parsing.ParseUtils;
-import org.jboss.as.server.RuntimeExpressionResolver;
 import org.jboss.as.server.controller.resources.SystemPropertyResourceDefinition;
 import org.jboss.as.server.logging.ServerLogger;
 import org.jboss.as.server.operations.SystemPropertyAddHandler;
@@ -70,35 +69,6 @@ import org.wildfly.security.manager.WildFlySecurityManager;
  * @author <a href="mailto:darran.lofthouse@jboss.com">Darran Lofthouse</a>
  */
 class SystemPropertiesXml {
-
-    /**
-     * Helper vault reader to detect the presence of vaults in the properties.
-     */
-    private static class PresentVaultReader implements VaultReader {
-
-        private boolean vaultPresent;
-
-        public PresentVaultReader() {
-            vaultPresent = false;
-        }
-
-        @Override
-        public boolean isVaultFormat(String toCheck) {
-            return toCheck != null && VaultReader.STANDARD_VAULT_PATTERN.matcher(toCheck).matches();
-        }
-
-        @Override
-        public String retrieveFromVault(String vaultedData) {
-            if (isVaultFormat(vaultedData)) {
-                vaultPresent = true;
-            }
-            return vaultedData;
-        }
-
-        public boolean isVaultPresent() {
-            return vaultPresent;
-        }
-    };
 
     void parseSystemProperties(final XMLExtendedStreamReader reader, final ModelNode address,
             final Namespace expectedNs, final List<ModelNode> updates, boolean standalone) throws XMLStreamException {
@@ -167,25 +137,30 @@ class SystemPropertiesXml {
                 throw ParseUtils.missingRequired(reader, Collections.singleton(NAME));
             }
 
+            AtomicReference<String> newPropertyValue = null;
             try {
-                PresentVaultReader vaultReader = new PresentVaultReader();
-                ExpressionResolver resolver = new RuntimeExpressionResolver(vaultReader);
-                String newPropertyValue = SystemPropertyResourceDefinition.VALUE.resolveValue(resolver, op.get(VALUE)).asString();
+                String resolved = SystemPropertyResourceDefinition.VALUE.resolveValue(ExpressionResolver.EXTENSION_REJECTING, op.get(VALUE)).asStringOrNull();
+                newPropertyValue = new AtomicReference<>(resolved);
                 String oldPropertyValue = properties.getProperty(name);
-                if (oldPropertyValue != null && !oldPropertyValue.equals(newPropertyValue) && !vaultReader.isVaultPresent()) {
+                if (oldPropertyValue != null && !oldPropertyValue.equals(resolved)) {
                     ControllerLogger.ROOT_LOGGER.systemPropertyAlreadyExist(name);
                 }
-            } catch (OperationFailedException e) {
+            } catch (OperationFailedException | ExpressionResolver.ExpressionResolutionUserException | ExpressionResolver.ExpressionResolutionServerException e) {
                 ServerLogger.AS_ROOT_LOGGER.tracef(e, "Failed to resolve value for system property %s at parse time.", name);
             }
 
             if(standalone) {
                 //eagerly set the property so it can potentially be used by jboss modules
                 //only do this for standalone servers
-                try {
-                    System.setProperty(name, SystemPropertyResourceDefinition.VALUE.resolveValue(ExpressionResolver.SIMPLE, op.get(VALUE)).asString());
-                } catch (OperationFailedException e) {
-                    ServerLogger.AS_ROOT_LOGGER.tracef(e, "Failed to set property %s at parse time, it will be set later in the boot process", name);
+                if (newPropertyValue != null) {
+                    String val = newPropertyValue.get();
+                    if (val != null) {
+                        System.setProperty(name, newPropertyValue.get());
+                    } else {
+                        System.clearProperty(name);
+                    }
+                } else {
+                    ServerLogger.AS_ROOT_LOGGER.tracef("Failed to set property %s at parse time, it will be set later in the boot process", name);
                 }
             }
 
@@ -196,7 +171,7 @@ class SystemPropertiesXml {
     void writeProperties(final XMLExtendedStreamWriter writer, final ModelNode modelNode, Element element,
             boolean standalone) throws XMLStreamException {
         final List<Property> properties = modelNode.asPropertyList();
-        if (properties.size() > 0) {
+        if (!properties.isEmpty()) {
             writer.writeStartElement(element.getLocalName());
             for (Property prop : properties) {
                 writer.writeStartElement(Element.PROPERTY.getLocalName());

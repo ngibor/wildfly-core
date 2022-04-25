@@ -42,6 +42,7 @@ import java.security.PrivilegedAction;
 import java.security.Provider;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -52,6 +53,7 @@ import javax.security.auth.message.config.AuthConfigFactory;
 import org.jboss.as.controller.AbstractBoottimeAddStepHandler;
 import org.jboss.as.controller.AttributeMarshaller;
 import org.jboss.as.controller.AttributeParser;
+import org.jboss.as.controller.extension.ExpressionResolverExtension;
 import org.jboss.as.controller.OperationContext;
 import org.jboss.as.controller.OperationContext.AttachmentKey;
 import org.jboss.as.controller.OperationContext.Stage;
@@ -87,6 +89,7 @@ import org.jboss.msc.service.ServiceTarget;
 import org.wildfly.extension.elytron.capabilities.CredentialSecurityFactory;
 import org.wildfly.extension.elytron.capabilities.PrincipalTransformer;
 import org.wildfly.extension.elytron.capabilities._private.SecurityEventListener;
+import org.wildfly.extension.elytron.expression.DeploymentExpressionResolverProcessor;
 import org.wildfly.security.Version;
 import org.wildfly.security.auth.client.AuthenticationContext;
 import org.wildfly.security.auth.jaspi.DelegatingAuthConfigFactory;
@@ -160,15 +163,16 @@ class ElytronDefinition extends SimpleResourceDefinition {
     static final PropertiesAttributeDefinition SECURITY_PROPERTIES = new PropertiesAttributeDefinition.Builder("security-properties", true)
             .build();
 
-    public static final ElytronDefinition INSTANCE = new ElytronDefinition();
+    private final AtomicReference<ExpressionResolverExtension> resolverReference;
 
-    private ElytronDefinition() {
+    ElytronDefinition(AtomicReference<ExpressionResolverExtension> resolverReference) {
         super(new Parameters(ElytronExtension.SUBSYSTEM_PATH, ElytronExtension.getResourceDescriptionResolver())
                 .setAddHandler(new ElytronAdd())
                 .setRemoveHandler(new ElytronRemove())
                 .setCapabilities(ELYTRON_RUNTIME_CAPABILITY)
                 .addAccessConstraints(new SensitiveTargetAccessConstraintDefinition(new SensitivityClassification(ElytronExtension.SUBSYSTEM_NAME, ElytronDescriptionConstants.ELYTRON_SECURITY, true, true, true)),
                 new ApplicationTypeAccessConstraintDefinition(new ApplicationTypeConfig(ElytronExtension.SUBSYSTEM_NAME, ElytronDescriptionConstants.ELYTRON_SECURITY, false))));
+        this.resolverReference = resolverReference;
     }
 
     @Override
@@ -176,7 +180,7 @@ class ElytronDefinition extends SimpleResourceDefinition {
         final boolean serverOrHostController = isServerOrHostController(resourceRegistration);
 
         // Expression Resolver
-        resourceRegistration.registerSubModel(ExpressionResolverResourceDefinition.getExpressionResolverDefinition(resourceRegistration.getPathAddress()));
+        resourceRegistration.registerSubModel(ExpressionResolverResourceDefinition.getExpressionResolverDefinition(resourceRegistration.getPathAddress(), resolverReference));
 
         // Provider Loader
         resourceRegistration.registerSubModel(ProviderDefinitions.getAggregateProvidersDefinition());
@@ -214,6 +218,7 @@ class ElytronDefinition extends SimpleResourceDefinition {
         resourceRegistration.registerSubModel(new CachingRealmDefinition());
         resourceRegistration.registerSubModel(new DistributedRealmDefinition());
         resourceRegistration.registerSubModel(new FailoverRealmDefinition());
+        resourceRegistration.registerSubModel(new JaasRealmDefinition());
 
         // Security Factories
         resourceRegistration.registerSubModel(new CustomComponentDefinition<>(CredentialSecurityFactory.class, Function.identity(), ElytronDescriptionConstants.CUSTOM_CREDENTIAL_SECURITY_FACTORY, SECURITY_FACTORY_CREDENTIAL_RUNTIME_CAPABILITY));
@@ -517,6 +522,7 @@ class ElytronDefinition extends SimpleResourceDefinition {
                 context.addStep(new AbstractDeploymentChainStep() {
                     @Override
                     protected void execute(DeploymentProcessorTarget processorTarget) {
+                        processorTarget.addDeploymentProcessor(ElytronExtension.SUBSYSTEM_NAME, Phase.STRUCTURE, Phase.STRUCTURE_ELYTRON_EXPRESSION_RESOLVER, new DeploymentExpressionResolverProcessor());
                         processorTarget.addDeploymentProcessor(ElytronExtension.SUBSYSTEM_NAME, Phase.STRUCTURE,  Phase.STRUCTURE_SECURITY_METADATA, new SecurityMetaDataProcessor());
                         processorTarget.addDeploymentProcessor(ElytronExtension.SUBSYSTEM_NAME, Phase.PARSE, Phase.PARSE_DEFINE_VIRTUAL_DOMAIN_NAME, new VirtualSecurityDomainNameProcessor());
                         processorTarget.addDeploymentProcessor(ElytronExtension.SUBSYSTEM_NAME, Phase.DEPENDENCIES, Phase.DEPENDENCIES_ELYTRON, new DependencyProcessor());

@@ -20,6 +20,7 @@ package org.wildfly.extension.elytron;
 import mockit.Mock;
 import mockit.MockUp;
 
+import org.jboss.as.controller.RunningMode;
 import org.jboss.as.controller.capability.RuntimeCapability;
 import org.jboss.as.subsystem.test.AdditionalInitialization;
 import org.jboss.as.subsystem.test.ControllerInitializer;
@@ -128,6 +129,21 @@ class TestEnvironment extends AdditionalInitialization {
 
         createTemporaryKeyStoreFile(trustStore, trustFile);
         createTemporaryKeyStoreFile(localhostKeyStore, localhostFile);
+    }
+
+    private final RunningMode runningMode;
+
+    TestEnvironment() {
+        this(RunningMode.NORMAL);
+    }
+
+    TestEnvironment(RunningMode runningMode) {
+        this.runningMode = runningMode;
+    }
+
+    @Override
+    protected RunningMode getRunningMode() {
+        return runningMode;
     }
 
     @Override

@@ -133,9 +133,10 @@ public class CommandBuilderTest {
 
         Assert.assertTrue("Missing debug argument", commands.contains(String.format(StandaloneCommandBuilder.DEBUG_FORMAT, "y", 5005)));
 
-        // If we're using Java 9+ ensure the modular JDK options were added
-        testModularJvmArguments(commands, 1);
-
+        // If we're using Java 12+. the enhanced security manager option must be set.
+        testEnhancedSecurityManager(commands, 1);
+        // Bootable JAR handles JPMS arguments thanks to its Manifest file.
+        testJPMSArguments(commands, 0);
         // A system property should only be added ones
         long count = 0L;
         for (String s : commandBuilder.getJavaOptions()) {
@@ -179,7 +180,7 @@ public class CommandBuilderTest {
 
         Assert.assertTrue("Missing -b=0.0.0.0", commands.contains("-b=0.0.0.0"));
 
-        Assert.assertTrue("Missing -b=0.0.0.0", commands.contains("--master-address=0.0.0.0"));
+        Assert.assertTrue("Missing -b=0.0.0.0", commands.contains("--primary-address=0.0.0.0"));
 
         Assert.assertTrue("Missing -b=0.0.0.0", commands.contains("-bmanagement=0.0.0.0"));
 
@@ -255,39 +256,34 @@ public class CommandBuilderTest {
         Assert.assertTrue("Missing -Dprop3=value3", stringArgs.contains("-Dprop3=value3"));
     }
 
-    private void testModularJvmArguments(final Collection<String> command, final int expectedCount) {
-        // If we're using Java 9+ ensure the modular JDK options were added
-        if (Jvm.current().isModular()) {
-            assertArgumentExists(command, "--add-exports=java.desktop/sun.awt=ALL-UNNAMED", expectedCount);
-            assertArgumentExists(command, "--add-exports=java.naming/com.sun.jndi.ldap=ALL-UNNAMED", expectedCount);
-            assertArgumentExists(command, "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED", expectedCount);
-            assertArgumentExists(command, "--add-opens=java.base/java.io=ALL-UNNAMED", expectedCount);
-            assertArgumentExists(command, "--add-opens=java.base/java.security=ALL-UNNAMED", expectedCount);
-            assertArgumentExists(command, "--add-opens=java.base/java.util=ALL-UNNAMED", expectedCount);
-            assertArgumentExists(command, "--add-opens=java.management/javax.management=ALL-UNNAMED", expectedCount);
-            assertArgumentExists(command, "--add-opens=java.naming/javax.naming=ALL-UNNAMED", expectedCount);
-            assertArgumentExists(command, "--add-modules=java.se", expectedCount);
+    private void testEnhancedSecurityManager(final Collection<String> command, final int expectedCount) {
+        // If we're using Java 12+ ensure enhanced security manager option was added
+        if (Jvm.current().enhancedSecurityManagerAvailable()) {
+            assertArgumentExists(command, "-Djava.security.manager=allow", expectedCount);
         } else {
-            Assert.assertFalse("Did not expect \"--add-exports=java.base/sun.awt=ALL-UNNAMED\" to be in the command list",
-                    command.contains("--add-exports=java.base/sun.awt=ALL-UNNAMED"));
-            Assert.assertFalse("Did not expect \"--add-exports=java.naming/com.sun.jndi.ldap=ALL-UNNAMED\" to be in the command list",
-                    command.contains("--add-exports=java.naming/com.sun.jndi.ldap=ALL-UNNAMED"));
-            Assert.assertFalse("Did not expect \"--add-opens=java.base/java.lang=ALL-UNNAMED\" to be in the command list",
-                    command.contains("--add-opens=java.base/java.lang=ALL-UNNAMED"));
-            Assert.assertFalse("Did not expect \"--add-opens=java.base/java.lang.invoke=ALL-UNNAMED\" to be in the command list",
-                    command.contains("--add-opens=java.base/java.lang.invoke=ALL-UNNAMED"));
-            Assert.assertFalse("Did not expect \"--add-opens=java.base/java.io=ALL-UNNAMED\" to be in the command list",
-                    command.contains("--add-opens=java.base/java.io=ALL-UNNAMED"));
-            Assert.assertFalse("Did not expect \"--add-opens=java.base/java.security=ALL-UNNAMED\" to be in the command list",
-                    command.contains("--add-opens=java.base/java.security=ALL-UNNAMED"));
-            Assert.assertFalse("Did not expect \"--add-opens=java.base/java.util=ALL-UNNAMED\" to be in the command list",
-                    command.contains("--add-opens=java.base/java.util=ALL-UNNAMED"));
-            Assert.assertFalse("Did not expect \"--add-opens=java.management/javax.management=ALL-UNNAMED\" to be in the command list",
-                    command.contains("--add-opens=java.management/javax.management=ALL-UNNAMED"));
-            Assert.assertFalse("Did not expect \"--add-opens=java.naming/javax.naming=ALL-UNNAMED\" to be in the command list",
-                    command.contains("--add-opens=java.naming/javax.naming=ALL-UNNAMED"));
-            Assert.assertFalse("Did not expect \"--add-modules=java.se\" to be in the command list", command.contains("--add-modules=java.se"));
+            Assert.assertFalse("Did not expect \"-Djava.security.manager=allow\" to be in the command list",
+                    command.contains("-Djava.security.manager=allow"));
         }
+    }
+
+    private void testJPMSArguments(final Collection<String> command, final int expectedCount) {
+        // Check exports and opens
+        assertArgumentExists(command, "--add-exports=java.desktop/sun.awt=ALL-UNNAMED", expectedCount);
+        assertArgumentExists(command, "--add-exports=java.naming/com.sun.jndi.ldap=ALL-UNNAMED", expectedCount);
+        assertArgumentExists(command, "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED", expectedCount);
+        assertArgumentExists(command, "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED", expectedCount);
+        assertArgumentExists(command, "--add-opens=java.base/java.io=ALL-UNNAMED", expectedCount);
+        assertArgumentExists(command, "--add-opens=java.base/java.security=ALL-UNNAMED", expectedCount);
+        assertArgumentExists(command, "--add-opens=java.base/java.util=ALL-UNNAMED", expectedCount);
+        assertArgumentExists(command, "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED", expectedCount);
+        assertArgumentExists(command, "--add-opens=java.management/javax.management=ALL-UNNAMED", expectedCount);
+        assertArgumentExists(command, "--add-opens=java.naming/javax.naming=ALL-UNNAMED", expectedCount);
+        assertArgumentExists(command, "--add-modules=java.se", expectedCount);
+    }
+
+    private void testModularJvmArguments(final Collection<String> command, final int expectedCount) {
+        testEnhancedSecurityManager(command, expectedCount);
+        testJPMSArguments(command, expectedCount);
     }
 
     private static void assertArgumentExists(final Collection<String> args, final String arg, final int expectedCount) {

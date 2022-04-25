@@ -54,7 +54,6 @@ import org.jboss.as.server.deployment.MountType;
 import org.jboss.as.server.deployment.Phase;
 import org.jboss.as.server.deployment.module.ExtensionListEntry;
 import org.jboss.as.server.deployment.module.ResourceRoot;
-import org.jboss.as.server.services.security.VaultReaderException;
 import org.jboss.as.server.suspend.ServerActivity;
 import org.jboss.invocation.proxy.MethodIdentifier;
 import org.jboss.logging.BasicLogger;
@@ -233,12 +232,12 @@ public interface ServerLogger extends BasicLogger {
     void cannotAddURLStreamHandlerFactory(@Cause Exception cause, String moduleID);
 
     @LogMessage(level = INFO)
-    @Message(id = 25, value = "%s started in %dms - Started %d of %d services (%d services are lazy, passive or on-demand)")
-    void startedClean(String prettyVersionString, long time, int startedServices, int allServices, int passiveOnDemandServices);
+    @Message(id = 25, value = "%s started in %dms - Started %d of %d services (%d services are lazy, passive or on-demand) %s")
+    void startedClean(String prettyVersionString, long time, int startedServices, int allServices, int passiveOnDemandServices, String append);
 
     @LogMessage(level = ERROR)
-    @Message(id = 26, value = "%s started (with errors) in %dms - Started %d of %d services (%d services failed or missing dependencies, %d services are lazy, passive or on-demand)")
-    void startedWitErrors(String prettyVersionString, long time, int startedServices, int allServices, int problemServices, int passiveOnDemandServices);
+    @Message(id = 26, value = "%s started (with errors) in %dms - Started %d of %d services (%d services failed or missing dependencies, %d services are lazy, passive or on-demand) %s")
+    void startedWitErrors(String prettyVersionString, long time, int startedServices, int allServices, int problemServices, int passiveOnDemandServices, String append);
 
     @LogMessage(level = INFO)
     @Message(id = 27, value = "Starting deployment of \"%s\" (runtime-name: \"%s\")")
@@ -368,8 +367,8 @@ public interface ServerLogger extends BasicLogger {
     void caughtExceptionDuringBoot(@Cause Exception e);
 
 
-    @Message(id = 56, value = "Server boot has failed in an unrecoverable manner; exiting. See previous messages for details.")
-    String unsuccessfulBoot();
+    @Message(id = 56, value = "Server boot has failed in an unrecoverable manner; exiting. See previous messages for details. %s")
+    String unsuccessfulBoot(String append);
 
     /**
      * Logs an error message indicating the content for a configured deployment was unavailable at boot but boot
@@ -654,8 +653,8 @@ public interface ServerLogger extends BasicLogger {
      *
      * @return a RuntimeException wrapper
      */
-    @Message(id = 76, value = "Error initializing vault --  %s")
-    VaultReaderException cannotCreateVault(@Param Throwable cause, Throwable msg);
+//    @Message(id = 76, value = "Error initializing vault --  %s")
+//    VaultReaderException cannotCreateVault(@Param Throwable cause, Throwable msg);
 
 //    /**
 //     * Creates an error message indicating that connecting to the HC failed.
@@ -792,7 +791,7 @@ public interface ServerLogger extends BasicLogger {
 //                                                                                       String secureSocketBindingAttr);
 
     @Message(id = 115, value = "System property %s cannot be set via the xml configuration file or from a management client; " +
-            "it's value must be known at initial process start so it can only set from the commmand line")
+            "it's value must be known at initial process start so it can only set from the command line")
     OperationFailedException systemPropertyNotManageable(String propertyName);
 
 
@@ -1170,8 +1169,8 @@ public interface ServerLogger extends BasicLogger {
      * @param e underlying exception
      * @return {@link org.jboss.as.server.services.security.VaultReaderException}
      */
-    @Message(id = 227, value = "Security exception accessing the vault")
-    VaultReaderException vaultReaderException(@Cause Exception e);
+//    @Message(id = 227, value = "Security exception accessing the vault")
+//    VaultReaderException vaultReaderException(@Cause Exception e);
 
     // No longer used
 //    @Message(id = 228, value = "Security Exception")
@@ -1283,7 +1282,7 @@ public interface ServerLogger extends BasicLogger {
     @Message(id = 258, value = "Cannot explode a subdeployment of an unexploded deployment")
     OperationFailedException cannotExplodeSubDeploymentOfUnexplodedDeployment();
 
-    @Message(id = 259, value = "If attribute secure-socket-binding is defined one of ssl-context or security-realm must also be defined")
+    @Message(id = 259, value = "If attribute secure-socket-binding is defined ssl-context must also be defined")
     OperationFailedException secureSocketBindingRequiresSSLContext();
 
     @LogMessage(level = INFO)
@@ -1379,6 +1378,25 @@ public interface ServerLogger extends BasicLogger {
     @Message(id = 284, value = "Failed to restore the configuration after failing to initialize the repository %s")
     RuntimeException failedToRestoreConfiguration(@Cause Exception cause, String repository);
 
+    @LogMessage(level = WARN)
+    @Message(id = 285, value = "Vault support has been removed, no vault resources will be initialised.")
+    void vaultSupportRemoved();
+
+    @Message(id = 286, value = "Failed to index static module %s for annotations")
+    DeploymentUnitProcessingException staticModuleIndexingFailed(String moduleId, @Cause Throwable cause);
+
+    @Message(id = 287, value = "Security realms are no longer supported, please migrate references to them from the configuration.")
+    XMLStreamException securityRealmReferencesUnsupported();
+
+    @Message(id = 288, value = "Unable to create tmp dir for auth tokens as file already exists.")
+    IllegalStateException unableToCreateTempDirForAuthTokensFileExists();
+
+    @Message(id = 289, value = "Unable to create auth dir %s.")
+    IllegalStateException unableToCreateAuthDir(String dir);
+
+    @Message(id = 290, value = "Couldn't find the specified YAML file %s")
+    IllegalArgumentException unableToFindYaml(String file);
+
     ////////////////////////////////////////////////
     //Messages without IDs
 
@@ -1394,4 +1412,6 @@ public interface ServerLogger extends BasicLogger {
     @Message(id = Message.NONE, value = "Adding .gitignore")
     String addingIgnored();
 
+    @Message(id = Message.NONE, value = "- Server configuration file in use: %s")
+    String serverConfigFileInUse(String serverConfigFile);
 }

@@ -41,7 +41,6 @@ import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SOC
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SOCKET_BINDING_GROUP;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SUBSYSTEM;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.SYSTEM_PROPERTY;
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.VAULT;
 import static org.jboss.as.controller.parsing.Namespace.CURRENT;
 import static org.jboss.as.controller.parsing.ParseUtils.isNoNamespaceAttribute;
 import static org.jboss.as.controller.parsing.ParseUtils.missingRequired;
@@ -97,7 +96,7 @@ import org.jboss.staxmapper.XMLExtendedStreamReader;
 import org.jboss.staxmapper.XMLExtendedStreamWriter;
 
 /**
- * Parser and marshaller for standalone server configuration xml documents (e.g. standalone.xml) that use the urn:jboss:domain:18.0 schema.
+ * Parser and marshaller for standalone server configuration xml documents (e.g. standalone.xml) that use the urn:jboss:domain:19.0 schema.
  *
  * @author Brian Stansberry
  * @author <a href="mailto:david.lloyd@redhat.com">David M. Lloyd</a>
@@ -227,10 +226,6 @@ final class StandaloneXml_18 extends CommonXml implements ManagementXmlDelegate 
             element = nextElement(reader, namespace);
         }
 
-        if (element == Element.VAULT) {
-            parseVault(reader, address, namespace, list);
-            element = nextElement(reader, namespace);
-        }
         if (element == Element.MANAGEMENT) {
             ManagementXml managementXml = ManagementXml.newInstance(namespace, this, false);
             managementXml.parseManagement(reader, address, list, false);
@@ -287,10 +282,6 @@ final class StandaloneXml_18 extends CommonXml implements ManagementXmlDelegate 
                         HttpManagementResourceDefinition.SASL_PROTOCOL.parseAndSetParameter(value, addOp, reader);
                         break;
                     }
-                    case SECURITY_REALM: {
-                        HttpManagementResourceDefinition.SECURITY_REALM.parseAndSetParameter(value, addOp, reader);
-                        break;
-                    }
                     case SERVER_NAME: {
                         HttpManagementResourceDefinition.SERVER_NAME.parseAndSetParameter(value, addOp, reader);
                         break;
@@ -329,10 +320,6 @@ final class StandaloneXml_18 extends CommonXml implements ManagementXmlDelegate 
                     }
                     case SASL_PROTOCOL: {
                         NativeManagementResourceDefinition.SASL_PROTOCOL.parseAndSetParameter(value, addOp, reader);
-                        break;
-                    }
-                    case SECURITY_REALM: {
-                        NativeManagementResourceDefinition.SECURITY_REALM.parseAndSetParameter(value, addOp, reader);
                         break;
                     }
                     case SERVER_NAME: {
@@ -748,10 +735,6 @@ final class StandaloneXml_18 extends CommonXml implements ManagementXmlDelegate 
             writePaths(writer, modelNode.get(PATH), false);
         }
 
-        if (modelNode.hasDefined(CORE_SERVICE) && modelNode.get(CORE_SERVICE).hasDefined(VAULT)) {
-            writeVault(writer, modelNode.get(CORE_SERVICE, VAULT));
-        }
-
         if (modelNode.hasDefined(CORE_SERVICE)) {
             ManagementXml managementXml = ManagementXml.newInstance(CURRENT, this, false);
             managementXml.writeManagement(writer, modelNode.get(CORE_SERVICE, MANAGEMENT), true);
@@ -948,7 +931,6 @@ final class StandaloneXml_18 extends CommonXml implements ManagementXmlDelegate 
         writer.writeStartElement(Element.NATIVE_INTERFACE.getLocalName());
         NativeManagementResourceDefinition.SASL_AUTHENTICATION_FACTORY.marshallAsAttribute(protocol, writer);
         NativeManagementResourceDefinition.SSL_CONTEXT.marshallAsAttribute(protocol, writer);
-        NativeManagementResourceDefinition.SECURITY_REALM.marshallAsAttribute(protocol, writer);
         NativeManagementResourceDefinition.SASL_PROTOCOL.marshallAsAttribute(protocol, writer);
         NativeManagementResourceDefinition.SERVER_NAME.marshallAsAttribute(protocol, writer);
 
@@ -968,7 +950,6 @@ final class StandaloneXml_18 extends CommonXml implements ManagementXmlDelegate 
         writer.writeStartElement(Element.HTTP_INTERFACE.getLocalName());
         HttpManagementResourceDefinition.HTTP_AUTHENTICATION_FACTORY.marshallAsAttribute(protocol, writer);
         HttpManagementResourceDefinition.SSL_CONTEXT.marshallAsAttribute(protocol, writer);
-        HttpManagementResourceDefinition.SECURITY_REALM.marshallAsAttribute(protocol, writer);
         HttpManagementResourceDefinition.SASL_PROTOCOL.marshallAsAttribute(protocol, writer);
         HttpManagementResourceDefinition.SERVER_NAME.marshallAsAttribute(protocol, writer);
         HttpManagementResourceDefinition.CONSOLE_ENABLED.marshallAsAttribute(protocol, writer);

@@ -28,7 +28,7 @@ import static java.nio.file.attribute.PosixFilePermission.OWNER_READ;
 import static java.nio.file.attribute.PosixFilePermission.OWNER_WRITE;
 import static org.hamcrest.CoreMatchers.hasItem;
 import static org.hamcrest.CoreMatchers.not;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -351,6 +351,23 @@ public class PersistanceResourceTestCase {
     public void testPersistentNameFromOutsideConfigDirectory() throws Exception {
         File file = createFile(externalDir, "standard.xml", "test");
         ConfigurationFile configurationFile = new ConfigurationFile(standardDir, "standard.xml", file.getAbsolutePath(), true);
+    }
+
+    @Test
+    public void testRelativePathFromOutsideConfigDirectory() throws Exception {
+        File file = createFile(externalDir, "standard.xml", "test");
+        try {
+            ConfigurationFile configurationFile = new ConfigurationFile(standardDir, "standard.xml", "../external/standard.xml", true);
+            Assert.fail("Should have rejected relative path");
+        } catch (IllegalStateException ise) {
+            // expected
+        }
+
+        try {
+            ConfigurationFile configurationFile = new ConfigurationFile(standardDir, "standard.xml", "../external/standard.xml", false);
+        } catch (IllegalStateException ise) {
+            Assert.fail("Should not have rejected relative path");
+        }
     }
 
     @Test

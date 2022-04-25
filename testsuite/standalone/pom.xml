@@ -15,7 +15,7 @@
     <parent>
         <groupId>org.wildfly.core</groupId>
         <artifactId>wildfly-core-testsuite</artifactId>
-        <version>17.0.0.Beta3-SNAPSHOT</version>
+        <version>19.0.0.Beta8-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -67,8 +67,8 @@
             <artifactId>wildfly-threads</artifactId>
         </dependency>
         <dependency>
-            <groupId>log4j</groupId>
-            <artifactId>log4j</artifactId>
+            <groupId>ch.qos.reload4j</groupId>
+            <artifactId>reload4j</artifactId>
         </dependency>
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
@@ -90,11 +90,6 @@
             <groupId>org.glassfish</groupId>
             <artifactId>jakarta.json</artifactId>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.wildfly.core</groupId>
-            <artifactId>wildfly-core-vault-test-galleon-pack</artifactId>
-            <type>pom</type>
         </dependency>
         <dependency>
             <groupId>org.wildfly.core</groupId>
@@ -156,6 +151,8 @@
 
                     <environmentVariables>
                         <JBOSS_HOME>${wildfly.home}</JBOSS_HOME>
+                        <!-- Used in one of the tests -->
+                        <TEST_ENVIRONMENT_VARIABLE>Hello world</TEST_ENVIRONMENT_VARIABLE>
                     </environmentVariables>
 
                     <systemPropertyVariables>
@@ -217,7 +214,7 @@
                         <phase>process-test-resources</phase>
                         <configuration>
                             <target>
-                                <copy file="${project.build.testOutputDirectory}/wildfly/standalone/configuration/mgmt-users.properties" todir="${project.build.directory}/wildfly-core/standalone/configuration" overwrite="true" />
+                                <copy file="${project.basedir}/src/test/resources/wildfly/standalone/configuration/mgmt-users.properties" todir="${project.build.directory}/wildfly-core/standalone/configuration" overwrite="true" />
                             </target>
                         </configuration>
                         <goals>

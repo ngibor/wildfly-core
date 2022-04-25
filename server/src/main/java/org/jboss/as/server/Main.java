@@ -22,7 +22,7 @@
 
 package org.jboss.as.server;
 
-import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.MASTER;
+import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.GIT_MASTER_BRANCH;
 
 import java.io.File;
 import java.io.IOException;
@@ -36,6 +36,7 @@ import java.util.Properties;
 import java.util.StringTokenizer;
 
 import org.jboss.as.controller.RunningMode;
+import org.jboss.as.controller.persistence.ConfigurationExtensionFactory;
 import org.jboss.as.controller.persistence.ConfigurationFile;
 import org.jboss.as.process.CommandLineConstants;
 import org.jboss.as.process.ExitCodes;
@@ -145,8 +146,9 @@ public final class Main {
         final int argsLength = args.length;
         String serverConfig = null;
         String gitRepository = null;
-        String gitBranch = MASTER;
+        String gitBranch = GIT_MASTER_BRANCH;
         String gitAuthConfiguration = null;
+        String supplementalConfiguration = null;
         RunningMode runningMode = RunningMode.NORMAL;
         ProductConfig productConfig;
         ConfigurationFile.InteractionPolicy configInteractionPolicy = ConfigurationFile.InteractionPolicy.STANDARD;
@@ -390,7 +392,23 @@ public final class Main {
                     } else {
                         gitBranch = arg.substring(idx + 1, arg.length());
                     }
-                }else {
+                } else if(ConfigurationExtensionFactory.isConfigurationExtensionSupported()
+                        && ConfigurationExtensionFactory.commandLineContainsArgument(arg)) {
+                    int idx = arg.indexOf("=");
+                    if (idx == -1) {
+                       final int next = i + 1;
+                        if (next < argsLength) {
+                            supplementalConfiguration = args[next];
+                            i++;
+                        } else {
+                            STDERR.println(ServerLogger.ROOT_LOGGER.valueExpectedForCommandLineOption(arg));
+                            usage();
+                            return new ServerEnvironmentWrapper (ServerEnvironmentWrapper.ServerEnvironmentStatus.ERROR);
+                        }
+                    } else {
+                        supplementalConfiguration = arg.substring(idx + 1, arg.length());
+                    }
+                } else {
                     STDERR.println(ServerLogger.ROOT_LOGGER.invalidCommandLineOption(arg));
                     usage();
                     return new ServerEnvironmentWrapper (ServerEnvironmentWrapper.ServerEnvironmentStatus.ERROR);
@@ -406,7 +424,7 @@ public final class Main {
         productConfig = ProductConfig.fromFilesystemSlot(Module.getBootModuleLoader(), WildFlySecurityManager.getPropertyPrivileged(ServerEnvironment.HOME_DIR, null), systemProperties);
         return new ServerEnvironmentWrapper(new ServerEnvironment(hostControllerName, systemProperties, systemEnvironment,
                 serverConfig, configInteractionPolicy, launchType, runningMode, productConfig, startTime, startSuspended,
-                startGracefully, gitRepository, gitBranch, gitAuthConfiguration));
+                startGracefully, gitRepository, gitBranch, gitAuthConfiguration, supplementalConfiguration));
     }
 
     private static void assertSingleConfig(String serverConfig) {

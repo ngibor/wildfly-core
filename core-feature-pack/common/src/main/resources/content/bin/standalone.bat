@@ -37,8 +37,11 @@ call "!DIRNAME!common.bat" :commonConf
 rem check for the security manager system property
 echo(!SERVER_OPTS! | findstr /r /c:"-Djava.security.manager" > nul
 if not errorlevel == 1 (
-    echo ERROR: The use of -Djava.security.manager has been removed. Please use the -secmgr command line argument or SECMGR=true environment variable.
-    GOTO :EOF
+    echo(!SERVER_OPTS! | findstr /r /c:"-Djava.security.manager=allow" > nul
+    if errorlevel == 1 (
+        echo ERROR: The use of -Djava.security.manager has been removed. Please use the -secmgr command line argument or SECMGR=true environment variable.
+        GOTO :EOF
+    )
 )
 setlocal DisableDelayedExpansion
 
@@ -281,7 +284,7 @@ if not "%PRESERVE_JAVA_OPT%" == "true" (
             )
             "!JAVA!" !TMP_PARAM! -version > nul 2>&1
             if not errorlevel == 1 (
-               set "JAVA_OPTS=%JAVA_OPTS% !TMP_PARAM!"
+               set "JAVA_OPTS=!JAVA_OPTS! !TMP_PARAM!"
             )
             rem Remove the gc.log file from the -version check
             del /F /Q "%JBOSS_LOG_DIR%\gc.log" > nul 2>&1
@@ -293,6 +296,10 @@ if not "%PRESERVE_JAVA_OPT%" == "true" (
     setlocal EnableDelayedExpansion
     call "!DIRNAME!common.bat" :setDefaultModularJvmOptions !JAVA_OPTS!
     set "JAVA_OPTS=!JAVA_OPTS! !DEFAULT_MODULAR_JVM_OPTIONS!"
+
+    rem Set default Security Manager configuration value
+    call "!DIRNAME!common.bat" :setSecurityManagerDefault
+    set "JAVA_OPTS=!JAVA_OPTS! !SECURITY_MANAGER_CONFIG_OPTION!"
     setlocal DisableDelayedExpansion
 )
 

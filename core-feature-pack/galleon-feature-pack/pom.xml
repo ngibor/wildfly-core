@@ -30,7 +30,7 @@
     <parent>
         <groupId>org.wildfly.core</groupId>
         <artifactId>wildfly-core-feature-pack-parent</artifactId>
-        <version>17.0.0.Beta3-SNAPSHOT</version>
+        <version>19.0.0.Beta8-SNAPSHOT</version>
     </parent>
 
     <artifactId>wildfly-core-galleon-pack</artifactId>
@@ -43,7 +43,6 @@
         <common.resources.directory>${basedir}/../common/src/main/resources</common.resources.directory>
         <ee-8-api.resources.directory>${basedir}/../ee-8-api/src/main/resources</ee-8-api.resources.directory>
         <galleon-common.resources.directory>${basedir}/../galleon-common/src/main/resources</galleon-common.resources.directory>
-        <galleon-pruned.resources.directory>${basedir}/../galleon-pruned/src/main/resources</galleon-pruned.resources.directory>
     </properties>
 
     <dependencies>
@@ -115,9 +114,20 @@
                         </goals>
                         <configuration>
                             <outputDirectory>${basedir}/target/resources</outputDirectory>
+                            <escapeString>\</escapeString>
                             <resources>
                                 <resource>
                                     <directory>${common.resources.directory}</directory>
+                                    <excludes>
+                                        <exclude>modules/**/module.xml</exclude>
+                                    </excludes>
+                                </resource>
+                                <resource>
+                                    <directory>${common.resources.directory}</directory>
+                                    <includes>
+                                        <include>modules/**/module.xml</include>
+                                    </includes>
+                                    <filtering>true</filtering>
                                 </resource>
                             </resources>
                         </configuration>
@@ -148,21 +158,6 @@
                             <resources>
                                 <resource>
                                     <directory>${galleon-common.resources.directory}</directory>
-                                </resource>
-                            </resources>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>copy-galleon-pruned-feature-pack-resources</id>
-                        <phase>process-resources</phase>
-                        <goals>
-                            <goal>copy-resources</goal>
-                        </goals>
-                        <configuration>
-                            <outputDirectory>${basedir}/target/resources</outputDirectory>
-                            <resources>
-                                <resource>
-                                    <directory>${galleon-pruned.resources.directory}</directory>
                                 </resource>
                             </resources>
                         </configuration>

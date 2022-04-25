@@ -22,13 +22,15 @@
 
 package org.jboss.as.server.deployment;
 
+import java.lang.ref.WeakReference;
+
 import org.jboss.as.controller.capability.CapabilityServiceSupport;
 import org.jboss.as.controller.registry.ImmutableManagementResourceRegistration;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
 import org.jboss.as.controller.registry.Resource;
 import org.jboss.as.controller.services.path.PathManager;
+import org.jboss.as.server.deployment.annotation.AnnotationIndexSupport;
 import org.jboss.as.server.deploymentoverlay.DeploymentOverlayIndex;
-import org.jboss.as.server.services.security.AbstractVaultReader;
 import org.jboss.msc.inject.Injector;
 import org.jboss.msc.service.ServiceRegistry;
 import org.jboss.msc.value.InjectedValue;
@@ -47,6 +49,7 @@ final class RootDeploymentUnitService extends AbstractDeploymentUnitService {
     private final String managementName;
     private final DeploymentUnit parent;
     private final DeploymentOverlayIndex deploymentOverlays;
+    private final WeakReference<AnnotationIndexSupport> annotationIndexSupport;
     private final boolean isExplodedContent;
 
     /**
@@ -58,26 +61,32 @@ final class RootDeploymentUnitService extends AbstractDeploymentUnitService {
      * @param mutableRegistration the mutable registration
      * @param resource the model
      * @param capabilityServiceSupport support for capability integration
-     * @param vaultReader the vault reader
      * @param deploymentOverlays the deployment overlays
+     * @param annotationIndexSupport operation-scoped cache of static module annotation indexes
      * @param exploded the deployment has been exploded
      */
     public RootDeploymentUnitService(final String name, final String managementName, final DeploymentUnit parent,
                                      final ImmutableManagementResourceRegistration registration, final ManagementResourceRegistration mutableRegistration,
                                      final Resource resource, final CapabilityServiceSupport capabilityServiceSupport,
-                                     final AbstractVaultReader vaultReader, DeploymentOverlayIndex deploymentOverlays, boolean exploded) {
-        super(registration, mutableRegistration, resource, capabilityServiceSupport, vaultReader);
+                                     final DeploymentOverlayIndex deploymentOverlays,
+                                     final AnnotationIndexSupport annotationIndexSupport,
+                                     final boolean exploded) {
+        super(registration, mutableRegistration, resource, capabilityServiceSupport);
         assert name != null : "name is null";
         this.name = name;
         this.managementName = managementName;
         this.parent = parent;
         this.deploymentOverlays = deploymentOverlays;
+        // Store the AnnotationIndexSupport in a weak reference. The OperationContext whose operations resulted in creation
+        // of this object will hold a strong ref. Once that OperationContext is gc'd this weak ref
+        // can be collected, preventing holding the possibly large indices in memory after completion
+        // of the related deployment operations.
+        this.annotationIndexSupport = new WeakReference<>(annotationIndexSupport);
         this.isExplodedContent = exploded;
     }
 
     protected DeploymentUnit createAndInitializeDeploymentUnit(final ServiceRegistry registry) {
         final DeploymentUnit deploymentUnit = new DeploymentUnitImpl(parent, name, registry);
-        deploymentUnit.putAttachment(Attachments.RUNTIME_NAME, name);
         deploymentUnit.putAttachment(Attachments.MANAGEMENT_NAME, managementName);
         deploymentUnit.putAttachment(Attachments.DEPLOYMENT_CONTENTS, contentsInjector.getValue());
         deploymentUnit.putAttachment(DeploymentResourceSupport.REGISTRATION_ATTACHMENT, registration);
@@ -85,9 +94,9 @@ final class RootDeploymentUnitService extends AbstractDeploymentUnitService {
         deploymentUnit.putAttachment(DeploymentResourceSupport.DEPLOYMENT_RESOURCE, resource);
         deploymentUnit.putAttachment(Attachments.DEPLOYMENT_RESOURCE_SUPPORT, new DeploymentResourceSupport(deploymentUnit));
         deploymentUnit.putAttachment(Attachments.CAPABILITY_SERVICE_SUPPORT, capabilityServiceSupport);
-        deploymentUnit.putAttachment(Attachments.VAULT_READER_ATTACHMENT_KEY, vaultReader);
         deploymentUnit.putAttachment(Attachments.DEPLOYMENT_OVERLAY_INDEX, deploymentOverlays);
         deploymentUnit.putAttachment(Attachments.PATH_MANAGER, pathManagerInjector.getValue());
+        deploymentUnit.putAttachment(Attachments.ANNOTATION_INDEX_SUPPORT, annotationIndexSupport);
         if(this.isExplodedContent) {
             MountExplodedMarker.setMountExploded(deploymentUnit);
         }

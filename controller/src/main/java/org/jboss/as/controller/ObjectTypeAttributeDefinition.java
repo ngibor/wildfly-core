@@ -281,6 +281,16 @@ public class ObjectTypeAttributeDefinition extends SimpleAttributeDefinition {
                 valueTypeDesc.get(ModelDescriptionConstants.DESCRIPTION).set(valueType.getAttributeTextDescription(bundle, p));
             }
 
+            // get deprecation description of the attribute
+            ModelNode deprecated = valueType.addDeprecatedInfo(valueTypeDesc);
+            if (deprecated != null) {
+                final String key = String.format("%s.%s", p, valueType.getName());
+                final String reason = resolver != null
+                        ? resolver.getResourceAttributeDeprecatedDescription(key, locale, bundle)
+                        : valueType.getAttributeDeprecatedDescription(bundle, p);
+                deprecated.get(ModelDescriptionConstants.REASON).set(reason);
+            }
+
             // set it as one of our value types, and return the value
             final ModelNode childType = node.get(ModelDescriptionConstants.VALUE_TYPE, valueType.getName()).set(valueTypeDesc);
             // if it is of type OBJECT itself (add its nested descriptions)
@@ -353,6 +363,15 @@ public class ObjectTypeAttributeDefinition extends SimpleAttributeDefinition {
         public Builder setSuffix(final String suffix) {
             this.suffix = suffix;
             return this;
+        }
+
+        /*
+       --------------------------
+       added for binary compatibility for running compatibilty tests
+         */
+        @Override
+        public Builder setAllowNull(boolean allowNull) {
+            return super.setAllowNull(allowNull);
         }
     }
 

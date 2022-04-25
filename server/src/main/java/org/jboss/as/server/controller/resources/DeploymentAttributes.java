@@ -127,7 +127,7 @@ public class DeploymentAttributes {
             .build();
 
     public static final AttributeDefinition STATUS = SimpleAttributeDefinitionBuilder.create(ModelDescriptionConstants.STATUS, ModelType.STRING, true)
-        .setValidator(new EnumValidator<AbstractDeploymentUnitService.DeploymentStatus>(AbstractDeploymentUnitService.DeploymentStatus.class, true))
+        .setValidator(new EnumValidator<AbstractDeploymentUnitService.DeploymentStatus>(AbstractDeploymentUnitService.DeploymentStatus.class))
         .build();
 
     public static final SimpleAttributeDefinition ENABLED_TIME = SimpleAttributeDefinitionBuilder.create(ModelDescriptionConstants.ENABLED_TIME, ModelType.LONG, true)
@@ -557,7 +557,7 @@ public class DeploymentAttributes {
         public void validateParameter(String parameterName, ModelNode contentItemNode) throws OperationFailedException {
             for (String key : contentItemNode.keys()){
                 boolean managedAttr = true;
-                if (CONTENT_ARCHIVE.equals(key)) {
+                if (CONTENT_ARCHIVE.getName().equals(key)) {
                     continue;
                 }
                 AttributeDefinition def = MANAGED_CONTENT_ATTRIBUTES.get(key);

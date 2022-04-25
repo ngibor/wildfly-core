@@ -87,6 +87,7 @@ interface ElytronDescriptionConstants {
     String CAA_IDENTITIES = "caa-identities";
     String CACHING_REALM = "caching-realm";
     String CASE_PRINCIPAL_TRANSFORMER = "case-principal-transformer";
+    String CALLBACK_HANDLER = "callback-handler";
     String CERTIFICATE = "certificate";
     String CERTIFICATE_ATTRIBUTE = "certificate-attribute";
     String CERTIFICATE_AUTHORITY = "certificate-authority";
@@ -189,6 +190,7 @@ interface ElytronDescriptionConstants {
     String ENABLING = "enabling";
     String ENCODED = "encoded";
     String ENCRYPTION = "encryption";
+    String ENTRY = "entry";
     String ENTRY_TYPE = "entry-type";
     String EVIDENCE_DECODER = "evidence-decoder";
     String EVIDENCE_DECODERS = "evidence-decoders";
@@ -267,6 +269,7 @@ interface ElytronDescriptionConstants {
     String ITERATION_COUNT_INDEX = "iteration-count-index";
     String ITERATOR_FILTER = "iterator-filter";
 
+    String JAAS_REALM = "jaas-realm";
     String JACC_POLICY = "jacc-policy";
     String JASPI = "jaspi";
     String JASPI_CONFIGURATION = "jaspi-configuration";
@@ -447,6 +450,7 @@ interface ElytronDescriptionConstants {
     String REALMS = "realms";
     String REASON = "reason";
     String RECONNECT_ATTEMPTS = "reconnect-attempts";
+    String RECURSIVE = "recursive";
     String REFERENCE = "reference";
     String REFERRAL_MODE = "referral-mode";
     String REGISTER_JASPI_FACTORY = "register-jaspi-factory";
@@ -597,6 +601,7 @@ interface ElytronDescriptionConstants {
     String VALIDATE = "validate";
     String VALIDITY = "validity";
     String VALUE = "value";
+    String VERBOSE = "verbose";
     String VERIFIABLE = "verifiable";
     String VERSION = "version";
     String VERSION_COMPARISON = "version-comparison";

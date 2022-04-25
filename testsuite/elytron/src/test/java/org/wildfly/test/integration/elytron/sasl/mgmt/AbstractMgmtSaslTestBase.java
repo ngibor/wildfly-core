@@ -19,7 +19,7 @@ package org.wildfly.test.integration.elytron.sasl.mgmt;
 import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -286,8 +286,7 @@ public abstract class AbstractMgmtSaslTestBase {
     }
 
     protected void assertDigestMechPassWhoAmI(String mechanismName, String digestAlg) {
-        // as the "digest-*" users are not in the ManagementFsRealm, the management identity will be "anonymous" here
-        createValidConfigForMechanism(mechanismName, digestAlg).run(() -> assertWhoAmI("anonymous"));
+        createValidConfigForMechanism(mechanismName, digestAlg).run(() -> assertWhoAmI(digestAlg));
     }
 
     /**

@@ -478,12 +478,19 @@ public abstract class ElytronUtil {
         return null;
     }
 
+    public static boolean hasServerSSLContext(CommandContext context, String sslContextName) {
+        return getChildResource(sslContextName, Util.SERVER_SSL_CONTEXT, context) != null;
+    }
+
     public static ServerSSLContext getServerSSLContext(CommandContext context, String sslContextName) {
         ModelNode sslContext = getChildResource(sslContextName, Util.SERVER_SSL_CONTEXT, context);
         ServerSSLContext ctx = null;
         if (sslContext != null) {
             String kmName = sslContext.get(Util.KEY_MANAGER).asString();
             ModelNode km = getChildResource(kmName, Util.KEY_MANAGER, context);
+            if (km == null) {
+                throw new IllegalArgumentException("The ServerSSLContext " + sslContextName + " references the KeyManager " + kmName + " that doesn't exist.");
+            }
             String ksName = km.get(Util.KEY_STORE).asString();
             KeyStore keyStore = new KeyStore(ksName, null, true);
             KeyManager keyManager = new KeyManager(kmName, keyStore, true);
@@ -607,7 +614,7 @@ public abstract class ElytronUtil {
                 for (String ksName : res.keys()) {
                     ModelNode ks = res.get(ksName);
                     AuthFactory fact = getAuthFactory(ks, ksName, spec, ctx);
-                    List<AuthMechanism> mecs = fact.getMechanisms();
+                    List<AuthMechanism> mecs = fact != null ? fact.getMechanisms() : Collections.emptyList();
                     if (mecs.isEmpty() || mecs.size() > 1) {
                         continue;
                     }

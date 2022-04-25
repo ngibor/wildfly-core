@@ -33,9 +33,9 @@ import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.VAL
 import static org.jboss.as.controller.security.CredentialReference.applyCredentialReferenceUpdateToRuntime;
 import static org.jboss.as.controller.security.CredentialReference.handleCredentialReferenceUpdate;
 import static org.jboss.as.controller.security.CredentialReference.rollbackCredentialStoreUpdate;
+import static org.jboss.as.domain.management.audit.KeystoreAttributes.KEYSTORE_PASSWORD_CREDENTIAL_REFERENCE_NAME;
+import static org.jboss.as.domain.management.audit.KeystoreAttributes.KEY_PASSWORD_CREDENTIAL_REFERENCE_NAME;
 import static org.jboss.as.domain.management.audit.SyslogAuditLogHandlerService.SYSLOG_AUDIT_HANDLER;
-import static org.jboss.as.domain.management.security.KeystoreAttributes.KEYSTORE_PASSWORD_CREDENTIAL_REFERENCE_NAME;
-import static org.jboss.as.domain.management.security.KeystoreAttributes.KEY_PASSWORD_CREDENTIAL_REFERENCE_NAME;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -86,7 +86,7 @@ public class SyslogAuditLogHandlerResourceDefinition extends AuditLogHandlerReso
         .setRequired(false)
         .setDefaultValue(new ModelNode(SyslogHandler.SyslogType.RFC5424.toString()))
         .setAllowExpression(true)
-        .setValidator(new EnumValidator<>(SyslogHandler.SyslogType.class, true, true))
+        .setValidator(EnumValidator.create(SyslogHandler.SyslogType.class))
         .setMinSize(1)
         .build();
 
@@ -104,7 +104,7 @@ public class SyslogAuditLogHandlerResourceDefinition extends AuditLogHandlerReso
 
     public static final SimpleAttributeDefinition FACILITY = new SimpleAttributeDefinitionBuilder(ModelDescriptionConstants.FACILITY, ModelType.STRING)
         .setRequired(false)
-        .setValidator(new EnumValidator<SyslogAuditLogHandler.Facility>(SyslogAuditLogHandler.Facility.class, true, true))
+        .setValidator(EnumValidator.create(SyslogAuditLogHandler.Facility.class))
         .setDefaultValue(new ModelNode(SyslogAuditLogHandler.Facility.USER_LEVEL.name()))
         .setAllowExpression(true)
         .build();

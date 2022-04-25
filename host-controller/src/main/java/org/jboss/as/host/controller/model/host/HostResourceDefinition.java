@@ -24,6 +24,7 @@ package org.jboss.as.host.controller.model.host;
 
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.DOMAIN_ORGANIZATION;
 import static org.jboss.as.controller.descriptions.ModelDescriptionConstants.HOST;
+import static org.jboss.as.controller.services.path.PathResourceDefinition.PATH_CAPABILITY;
 
 import org.jboss.as.controller.BootErrorCollector;
 import org.jboss.as.controller.ControlledProcessState;
@@ -71,7 +72,6 @@ import org.jboss.as.controller.registry.AttributeAccess;
 import org.jboss.as.controller.registry.ManagementResourceRegistration;
 import org.jboss.as.controller.services.path.PathManagerService;
 import org.jboss.as.controller.services.path.PathResourceDefinition;
-import static org.jboss.as.controller.services.path.PathResourceDefinition.PATH_CAPABILITY;
 import org.jboss.as.domain.controller.DomainController;
 import org.jboss.as.domain.controller.operations.DomainServerLifecycleHandlers;
 import org.jboss.as.domain.controller.operations.HostProcessReloadHandler;
@@ -113,7 +113,6 @@ import org.jboss.as.server.controller.resources.ModuleLoadingResourceDefinition;
 import org.jboss.as.server.controller.resources.ServerRootResourceDefinition;
 import org.jboss.as.server.controller.resources.ServiceContainerResourceDefinition;
 import org.jboss.as.server.controller.resources.SystemPropertyResourceDefinition;
-import org.jboss.as.server.controller.resources.VaultResourceDefinition;
 import org.jboss.as.server.operations.CleanObsoleteContentHandler;
 import org.jboss.as.server.operations.InstanceUuidReadHandler;
 import org.jboss.as.server.operations.RunningModeReadHandler;
@@ -122,7 +121,6 @@ import org.jboss.as.server.operations.WriteConfigHandler;
 import org.jboss.as.server.services.net.InterfaceResourceDefinition;
 import org.jboss.as.server.services.net.SocketBindingGroupResourceDefinition;
 import org.jboss.as.server.services.net.SpecifiedInterfaceResolveHandler;
-import org.jboss.as.server.services.security.AbstractVaultReader;
 import org.jboss.dmr.ModelNode;
 import org.jboss.dmr.ModelType;
 
@@ -205,7 +203,7 @@ public class HostResourceDefinition extends SimpleResourceDefinition {
     public static final SimpleAttributeDefinition DIRECTORY_GROUPING = SimpleAttributeDefinitionBuilder.create(ModelDescriptionConstants.DIRECTORY_GROUPING, ModelType.STRING, true).
             addFlag(AttributeAccess.Flag.RESTART_ALL_SERVICES).
             setDefaultValue(DirectoryGrouping.defaultValue().toModelNode()).
-            setValidator(EnumValidator.create(DirectoryGrouping.class, true, true)).
+            setValidator(EnumValidator.create(DirectoryGrouping.class)).
             setAllowExpression(true).
             build();
     public static final SimpleAttributeDefinition MASTER = SimpleAttributeDefinitionBuilder.create(ModelDescriptionConstants.MASTER, ModelType.BOOLEAN, true)
@@ -225,7 +223,6 @@ public class HostResourceDefinition extends SimpleResourceDefinition {
                 DomainControllerWriteAttributeHandler.PORT,
                 DomainControllerWriteAttributeHandler.AUTHENTICATION_CONTEXT,
                 DomainControllerWriteAttributeHandler.USERNAME,
-                DomainControllerWriteAttributeHandler.SECURITY_REALM,
                 DomainControllerWriteAttributeHandler.IGNORE_UNUSED_CONFIG,
                 DomainControllerWriteAttributeHandler.ADMIN_ONLY_POLICY)
             .build();
@@ -245,7 +242,6 @@ public class HostResourceDefinition extends SimpleResourceDefinition {
     private final ContentRepository contentRepository;
     private final DomainController domainController;
     private final ExtensionRegistry hostExtensionRegistry;
-    private final AbstractVaultReader vaultReader;
     private final IgnoredDomainResourceRegistry ignoredRegistry;
     private final ControlledProcessState processState;
     private final PathManagerService pathManager;
@@ -265,7 +261,6 @@ public class HostResourceDefinition extends SimpleResourceDefinition {
                                   final ContentRepository contentRepository,
                                   final DomainController domainController,
                                   final ExtensionRegistry hostExtensionRegistry,
-                                  final AbstractVaultReader vaultReader,
                                   final IgnoredDomainResourceRegistry ignoredRegistry,
                                   final ControlledProcessState processState,
                                   final PathManagerService pathManager,
@@ -296,7 +291,6 @@ public class HostResourceDefinition extends SimpleResourceDefinition {
         this.contentRepository = contentRepository;
         this.domainController = domainController;
         this.hostExtensionRegistry = hostExtensionRegistry;
-        this.vaultReader = vaultReader;
         this.ignoredRegistry = ignoredRegistry;
         this.processState = processState;
         this.pathManager = pathManager;
@@ -423,9 +417,6 @@ public class HostResourceDefinition extends SimpleResourceDefinition {
 
         /////////////////////////////////////////
         // Core Services
-
-        //vault
-        hostRegistration.registerSubModel(new VaultResourceDefinition(vaultReader));
 
         // Central Management
         ResourceDefinition nativeManagement = new NativeManagementResourceDefinition(hostControllerInfo);
